@@ -131,6 +131,7 @@ fun View3DScreen(vm: AppViewModel) {
         renderer.photos = bms; renderer.photosChanged = true; photosReady++
     }
     var lightsOn by remember { mutableStateOf(true) }
+    var followResident by remember { mutableStateOf(true) }
     var fadeToken by remember { mutableStateOf(0) }
     // Each switch controls only the lamps linked to it in the electrical plan.  Values survive recomposition while this view is open.
     val switchOn = remember(plan) { mutableStateMapOf<Int, Boolean>().apply { plan.points.filter { it.kind == com.dawoyan.roomik.core.PointKind.SWITCH }.forEach { put(it.id, true) } } }
@@ -143,12 +144,15 @@ fun View3DScreen(vm: AppViewModel) {
     if (photosOpen) SidePhotosDialog(root.id, onChanged = { photoTick++ }) { photosOpen = false }
     // layers turned on or off: the same view gets the new mesh, so the camera stays
     LaunchedEffect(renderer, ghost) { renderer.ghost = ghost; view.requestRender() }
-    LaunchedEffect(renderer, hidden) {
+    LaunchedEffect(renderer, hidden, followResident) {
         var step = 0
+        if (followResident) renderer.startFollowing()
         while (true) {
-            val m = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { meshFor(hidden, step++) }
+            val frame = step++
+            val (m, position) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { meshFor(hidden, frame) to Mesh.residentPosition(plan, frame) }
+            if (followResident && !renderer.inside) position?.let { renderer.follow(it) }
             renderer.swap(m); view.requestRender()
-            kotlinx.coroutines.delay(500)
+            kotlinx.coroutines.delay(250)
         }
     }
     // Opened from a room ("View inside" in the editor, or from elektronik): start inside it.
@@ -243,6 +247,7 @@ fun View3DScreen(vm: AppViewModel) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                     // what is shown: outer walls faint, and each system on or off
                     Row(Modifier.hScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(followResident, { followResident = !followResident }, label = { Text("👣 Следить") })
                         // the sun's season, and the photos round the plot
                         for ((d, icon) in listOf(-23.4 to "❄", 0.0 to "☀", 23.4 to "🌞"))
                             FilterChip(season == d, { season = d; renderer.declination = d; view.requestRender() }, label = { Text(icon) })
@@ -332,6 +337,8 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
     @Volatile private var dist = span * 1.3f + 4f
     @Volatile private var tx = (mesh.minX + mesh.maxX) / 2
     @Volatile private var tz = (mesh.minZ + mesh.maxZ) / 2
+    fun startFollowing() { framed = true; dist = 5f; pitch = 22f; yaw = 15f }
+    fun follow(p: P) { tx = (p.x / 1000).toFloat(); tz = (p.y / 1000).toFloat() }
 
     private var program = 0
     private var shadowProgram = 0
@@ -350,7 +357,7 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
     @Volatile private var nextMesh: Mesh? = null
     fun swap(m: Mesh) { nextMesh = m }
     private var aspect = 1f
-    private var framed = false
+    @Volatile private var framed = false
     private lateinit var buffer: FloatBuffer
 
     // Inside: eye at [eyeX], [eyeZ] (metres), looking along [lookYaw]/[lookPitch] degrees.

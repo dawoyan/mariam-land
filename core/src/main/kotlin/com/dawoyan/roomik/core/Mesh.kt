@@ -40,6 +40,31 @@ class Mesh(
         /** Walls with the outside on one side: they can be shown faint, to look into the house. */
         const val KIND_OUTER = 4f
 
+        /** Two safe points in the largest room, traversed slowly and repeatedly. Coordinates are millimetres. */
+        fun residentPosition(plan: Plan, step: Int): P? {
+            val room = Rooms.detect(plan).maxByOrNull { it.area } ?: return null
+            val poly = room.polygon
+            val xs = poly.map { it.x }; val ys = poly.map { it.y }
+            val candidates = mutableListOf<P>()
+            var x = xs.min() + 300.0
+            while (x < xs.max() - 300.0) {
+                var y = ys.min() + 300.0
+                while (y < ys.max() - 300.0) {
+                    val p = P(x, y)
+                    if (Geo.inside(p, poly) && plan.walls.all { w ->
+                        val a = plan.pos(w.a); val b = plan.pos(w.b)
+                        a == null || b == null || Geo.distToSegment(p, a, b) > 300.0
+                    }) candidates += p
+                    y += 400.0
+                }
+                x += 400.0
+            }
+            val start = candidates.minByOrNull { (it - room.anchor).len } ?: room.anchor
+            val end = candidates.filter { Interior.canWalk(plan, start, it) }.maxByOrNull { (it - start).len } ?: start
+            val t = (1.0 - kotlin.math.cos(step * Math.PI / 40.0)) * 0.5
+            return start + (end - start) * t
+        }
+
         /** Room numbers in the vertex data: unique over all floors, -1 outside. */
         fun roomNo(floor: Int, index: Int) = if (index < 0) -1 else (floor + 10) * 100 + index
 
@@ -215,22 +240,23 @@ class Mesh(
 
             // A simple in-scene resident, on the selected floor rather than in the saved house model.
             if (fi == residentFloor && rooms.isNotEmpty()) {
-                val residentRoom = rooms.maxByOrNull { it.area }!!
-                val origin = residentRoom.anchor
-                val distance = doubleArrayOf(0.0, 150.0, 300.0, 450.0, 600.0, 450.0, 300.0, 150.0)[residentStep.mod(8)]
-                val candidate = origin + P(distance, 0.0)
-                val p = if (Geo.inside(candidate, residentRoom.polygon) && Interior.canWalk(plan, origin, candidate)) candidate else origin
-                val stride = if (residentStep.mod(2) == 0) 75.0 else -75.0
+                val p = residentPosition(plan, residentStep) ?: rooms.first().anchor
+                val stride = kotlin.math.sin(residentStep * Math.PI / 4) * 105.0
+                val bob = (kotlin.math.abs(kotlin.math.sin(residentStep * Math.PI / 4)) * 0.025).toFloat()
                 kind = KIND_PLAIN; room = -1
                 fun part(dx: Double, dy: Double, w: Double, d: Double, y0: Float, y1: Float, color: Int) =
                     box(rect(p + P(dx, dy), P(1.0, 0.0), w / 2, d / 2), y0, y1, color)
                 part(-90.0, stride, 130.0, 180.0, 0f, .75f, 0x344866)
                 part(90.0, -stride, 130.0, 180.0, 0f, .75f, 0x344866)
-                part(0.0, 0.0, 370.0, 210.0, .75f, 1.35f, 0xD96375)
-                part(-250.0, 0.0, 110.0, 140.0, .82f, 1.3f, 0xDDAA88)
-                part(250.0, 0.0, 110.0, 140.0, .82f, 1.3f, 0xDDAA88)
-                part(0.0, 0.0, 260.0, 230.0, 1.35f, 1.65f, 0xE6B392)
-                part(0.0, 0.0, 280.0, 250.0, 1.65f, 1.75f, 0x44352E)
+                part(0.0, 0.0, 340.0, 200.0, .75f, 1.35f + bob, 0xD96375)
+                part(-230.0, -stride * .6, 100.0, 130.0, .85f, 1.3f + bob, 0xE6B392)
+                part(230.0, stride * .6, 100.0, 130.0, .85f, 1.3f + bob, 0xE6B392)
+                part(0.0, 0.0, 235.0, 200.0, 1.36f + bob, 1.65f + bob, 0xE6B392)
+                part(0.0, -35.0, 255.0, 180.0, 1.64f + bob, 1.73f + bob, 0x44352E)
+                part(0.0, -95.0, 255.0, 70.0, 1.39f + bob, 1.68f + bob, 0x44352E)
+                part(-48.0, 104.0, 28.0, 10.0, 1.53f + bob, 1.56f + bob, 0x322927)
+                part(48.0, 104.0, 28.0, 10.0, 1.53f + bob, 1.56f + bob, 0x322927)
+                part(0.0, 105.0, 65.0, 10.0, 1.445f + bob, 1.46f + bob, 0xAD555A)
             }
 
             // A plinth under the ground floor's walls, down to the ground when the house stands above it.

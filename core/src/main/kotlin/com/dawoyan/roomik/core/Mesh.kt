@@ -598,7 +598,7 @@ class Mesh(
 
             // Electrical points: plates on the wall at their height (they go down with a lowered wall), lamps hanging.
             val lights = ArrayList<Light>()
-            for (p in if (Layer.ELECTRIC in hidden) emptyList() else Interior.place(plan)) {
+            for (p in Interior.place(plan).filter { Layer.ELECTRIC !in hidden || it.point.kind == PointKind.LAMP }) {
                 if (p.point.kind == PointKind.LAMP) {
                     kind = KIND_PLAIN
                     room = roomAt(p.face)

@@ -108,9 +108,9 @@ fun View3DScreen(vm: AppViewModel) {
     val plan = root.floor(floorNo)
     // with a roof the house is first seen whole; low walls take the roof off to look in
     var cutaway by remember { mutableStateOf(true) }
-    val hidden = vm.hidden + if (cutaway) setOf(com.dawoyan.roomik.core.Layer.ROOF) else emptySet()
+    val hidden = vm.hidden + setOf(com.dawoyan.roomik.core.Layer.ELECTRIC, com.dawoyan.roomik.core.Layer.WATER, com.dawoyan.roomik.core.Layer.HEATING, com.dawoyan.roomik.core.Layer.SEWER, com.dawoyan.roomik.core.Layer.NETWORK) + if (cutaway) setOf(com.dawoyan.roomik.core.Layer.ROOF) else emptySet()
     var ghost by remember { mutableStateOf(false) }
-    fun meshFor(h: Set<com.dawoyan.roomik.core.Layer>, step: Int = 0) = shown?.let { Mesh.build(root, it, it, markClashes = true, hidden = h, residentFloor = floorNo, residentStep = step) } ?: Mesh.build(root, root.floors.size, markClashes = true, hidden = h, residentFloor = floorNo, residentStep = step)
+    fun meshFor(h: Set<com.dawoyan.roomik.core.Layer>, step: Int = 0) = shown?.let { Mesh.build(root, it, it, hidden = h, residentFloor = floorNo, residentStep = step) } ?: Mesh.build(root, root.floors.size, hidden = h, residentFloor = floorNo, residentStep = step)
     val renderer = remember(root, shown) {
         val mesh = meshFor(hidden)
         // "Low walls" cuts the top storey shown, not the one being edited
@@ -134,7 +134,7 @@ fun View3DScreen(vm: AppViewModel) {
     }
     var lightsOn by remember { mutableStateOf(true) }
     var localWeather by remember { mutableStateOf<LocalWeather?>(null) }
-    var followResident by remember { mutableStateOf(true) }
+    var followResident by remember { mutableStateOf(false) }
     var fadeToken by remember { mutableStateOf(0) }
     // Each switch controls only the lamps linked to it in the electrical plan.  Values survive recomposition while this view is open.
     val switchOn = remember(plan) { mutableStateMapOf<Int, Boolean>().apply { plan.points.filter { it.kind == com.dawoyan.roomik.core.PointKind.SWITCH }.forEach { put(it.id, true) } } }

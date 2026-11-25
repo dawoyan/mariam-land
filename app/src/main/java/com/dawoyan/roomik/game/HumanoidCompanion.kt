@@ -84,6 +84,19 @@ fun HumanoidCompanion(vm: AppViewModel) {
     var dialog by remember { mutableStateOf(selected.isEmpty()) }
     var careOpen by remember { mutableStateOf(false) }
     val progress = remember(vm.root) { homeProgress(vm) }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60000); now = System.currentTimeMillis() } }
+    val dryTree = vm.root?.allFloors.orEmpty().flatMap { it.models }.firstOrNull { tree ->
+        val key = "tree_${vm.root?.id}_${tree.id}"
+        tree.yard?.kind in setOf(YardKind.TREE, YardKind.POPLAR, YardKind.CYPRESS) && prefs.contains(key) && now - prefs.getLong(key, now) >= 14 * 3600000L
+    }
+    val concern = when {
+        !progress.complete -> progress.next()
+        prefs.getBoolean("dog", false) && now - prefs.getLong("dog_fed", now) > 12 * 3600000L -> "Собака голодна, давай её покормим. / Շունը սոված է, կերակրենք նրան։"
+        dryTree != null -> "Дерево ${dryTree.name} засыхает, ему нужна вода. / Ծառը ջրի կարիք ունի։"
+        now - prefs.getLong("cleaned", 0L) > 24 * 3600000L -> "Дома пора пропылесосить. / Ժամանակն է փոշեկուլով մաքրել տունը։"
+        else -> "Спасибо, дома хорошо! / Շնորհակալ եմ, տանը լավ է։"
+    }
     val speak = rememberRussianSpeech(context)
     val pulse by rememberInfiniteTransition(label = "resident")
         .animateFloat(0f, 5f, infiniteRepeatable(tween(1100, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "resident-breath")
@@ -104,6 +117,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
                 TextButton(onClick = { careOpen = true }) { Text("🌱 🐕") }
                 TextButton(onClick = { dialog = true }) { Text("💬") }
             }
+            Text("💬 $concern", modifier = Modifier.clickable { dialog = true }, style = MaterialTheme.typography.labelSmall, maxLines = 2)
             Text(progress.checks.joinToString("  ") { (label, done) -> "${if (done) "✓" else "○"} $label" }, style = MaterialTheme.typography.labelSmall, maxLines = 2)
         }
     }
@@ -116,7 +130,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
             speak("Привет! Я $chosenName, мне $age. Я хочу уютный дом.")
         }
     )
-    if (dialog && selected.isNotEmpty()) ResidentDialog(name, residentAge, portrait, face, progress, pulse, place, speak, ::go) { dialog = false }
+    if (dialog && selected.isNotEmpty()) ResidentDialog(name, residentAge, portrait, face, progress, concern, pulse, place, speak, ::go) { dialog = false }
     if (careOpen) {
         val root = vm.root
         val trees = root?.allFloors.orEmpty().flatMap { it.models }
@@ -127,7 +141,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
         var robot by remember { mutableStateOf(prefs.getBoolean("robot_vacuum", false)) }
         var cleaned by remember { mutableStateOf(prefs.getLong("cleaned", 0L)) }
         androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); tick = System.currentTimeMillis() } }
-        AlertDialog(onDismissRequest = { careOpen = false }, title = { Text("Уход за домом") }, text = {
+        AlertDialog(onDismissRequest = { careOpen = false; now = System.currentTimeMillis() }, title = { Text("Уход за домом") }, text = {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 Text(if (cleaned == 0L || tick - cleaned > 24 * 3600000L) "🏠 Пора пропылесосить" else "✨ Пол чистый")
                 TextButton(onClick = { cleaned = tick; prefs.edit().putLong("cleaned", tick).apply(); speak("Я пропылесосила дом.") }) { Text("🧹 Попросить пропылесосить") }
@@ -147,7 +161,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
                     TextButton(onClick = { fed = tick; prefs.edit().putLong("dog_fed", tick).apply() }) { Text("🍖 Покормить собаку") }
                 }
             }
-        }, confirmButton = { TextButton(onClick = { careOpen = false }) { Text("Готово") } })
+        }, confirmButton = { TextButton(onClick = { careOpen = false; now = System.currentTimeMillis() }) { Text("Готово") } })
     }
 }
 
@@ -189,15 +203,14 @@ private fun CharacterChoice(onPick: (String, String, Int) -> Unit) {
 }
 
 @Composable
-private fun ResidentDialog(name: String, age: Int, portrait: Int, face: String, progress: HomeProgress, bob: Float, place: String, speak: (String) -> Unit, go: (String) -> Unit, close: () -> Unit) {
-    val message = progress.next()
+private fun ResidentDialog(name: String, age: Int, portrait: Int, face: String, progress: HomeProgress, message: String, bob: Float, place: String, speak: (String) -> Unit, go: (String) -> Unit, close: () -> Unit) {
     AlertDialog(
         onDismissRequest = close,
         icon = { Icon(Icons.Filled.Person, null) },
         title = { Text("$face $name") },
-        text = { Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        text = { Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             var question by remember { mutableStateOf("") }
-            var reply by remember(progress, place) { mutableStateOf(message) }
+            var reply by remember(message, place) { mutableStateOf(message) }
             Image(painterResource(portrait), null, Modifier.height(150.dp).graphicsLayer { translationY = bob })
             Text("Вы: Какой дом ты хочешь?")
             Text("$name${if (age > 0) ", $age" else ""}: Я хочу уютный дом.")
@@ -221,7 +234,7 @@ private fun ResidentDialog(name: String, age: Int, portrait: Int, face: String, 
             }
         } },
         confirmButton = { Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { speak(message) }) { Icon(Icons.Filled.Campaign, "Озвучить совет") }
+            IconButton(onClick = { speak(message.substringBefore(" / ")) }) { Icon(Icons.Filled.Campaign, "Озвучить совет") }
             TextButton(onClick = close) { Text("Строим") }
         } }
     )

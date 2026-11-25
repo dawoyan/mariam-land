@@ -180,7 +180,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun create(name: String) {
         val p = stamp(Plan(UUID.randomUUID().toString(), name))
-        save(p); open(p)
+        save(p); open(p); screen = Screen.EDITOR
     }
 
     fun open(p: Plan) {
@@ -205,7 +205,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         root = fixed
         floor = keepFloor(fixed, prefs.getInt("lastFloor:${fixed.id}", 0))
         prefs.edit().putString("lastProject", fixed.id).putInt("lastFloor:${fixed.id}", floor).apply()
-        screen = Screen.EDITOR
+        screen = if (fixed.allFloors.any { it.walls.isNotEmpty() }) Screen.VIEW3D else Screen.EDITOR
     }
 
     fun selectFloor(i: Int) {
@@ -268,6 +268,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val p = load().firstOrNull { it.id == planId } ?: return
         plans = load()
         open(p)
+        screen = Screen.EDITOR
         val m = roomId?.let { Regex("^([fb])(\\d+)-(.+)$").find(it) }
         if (m != null) {
             val n = m.groupValues[2].toInt()

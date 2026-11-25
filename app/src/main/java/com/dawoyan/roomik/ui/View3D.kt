@@ -131,6 +131,7 @@ fun View3DScreen(vm: AppViewModel) {
         renderer.photos = bms; renderer.photosChanged = true; photosReady++
     }
     var lightsOn by remember { mutableStateOf(true) }
+    var localWeather by remember { mutableStateOf<LocalWeather?>(null) }
     var followResident by remember { mutableStateOf(true) }
     var fadeToken by remember { mutableStateOf(0) }
     // Each switch controls only the lamps linked to it in the electrical plan.  Values survive recomposition while this view is open.
@@ -184,6 +185,7 @@ fun View3DScreen(vm: AppViewModel) {
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
             androidx.compose.runtime.key(view) { AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()) }
+            if (localWeather?.rain == true || localWeather?.snow == true) WeatherParticles(localWeather!!)
             // Gestures sit on top: one finger turns the camera around the plan, two fingers move and zoom.
             // Gestures sit on top. Outside: one finger turns around the plan, two move and zoom, a tap on a room walks in.
             // Inside: one finger looks around, two fingers step, a tap on the floor walks there.
@@ -247,6 +249,11 @@ fun View3DScreen(vm: AppViewModel) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                     // what is shown: outer walls faint, and each system on or off
                     Row(Modifier.hScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        LiveWeather { w ->
+                            localWeather = w; renderer.weatherSnow = w.snow
+                            renderer.weatherNight = !w.day; renderer.weatherCloudy = w.code >= 3
+                            renderer.sun = if (w.day) 0.45f else 0f; view.requestRender()
+                        }
                         FilterChip(followResident, { followResident = !followResident }, label = { Text("👣 Следить") })
                         // the sun's season, and the photos round the plot
                         for ((d, icon) in listOf(-23.4 to "❄", 0.0 to "☀", 23.4 to "🌞"))
@@ -331,6 +338,9 @@ private class Msaa : GLSurfaceView.EGLConfigChooser {
 
 /** Draws the plan mesh with an orbit camera: [yaw]/[pitch] in degrees around a target on the ground, [dist] metres away. */
 class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val base: Float = 0f, private val cutBase: Float = base) : GLSurfaceView.Renderer {
+    @Volatile var weatherSnow = false
+    @Volatile var weatherNight = false
+    @Volatile var weatherCloudy = false
     private val span = max(mesh.maxX - mesh.minX, mesh.maxZ - mesh.minZ)
     @Volatile private var yaw = 25f
     @Volatile private var pitch = 50f
@@ -725,7 +735,7 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
         if (photosChanged) loadPhotos()
         // with photos round the plot the ground is theirs: the plain ground under them grey, not grass
         run {
-            val c = if (photoTex.any { it != 0 }) 0x8F8D88 else 0x9DB58E
+            val c = if (weatherSnow) 0xE8EEF0 else if (photoTex.any { it != 0 }) 0x8F8D88 else 0x9DB58E
             for (k in 0 until mesh.groundCount) {
                 val o = k * Mesh.STRIDE + 6
                 buffer.put(o, (c shr 16 and 255) / 255f); buffer.put(o + 1, (c shr 8 and 255) / 255f); buffer.put(o + 2, (c and 255) / 255f)
@@ -759,7 +769,9 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
 
         // 2. The scene.
         val day = sd[1].coerceIn(0f, 1f)
-        GLES20.glClearColor(0.62f + 0.18f * day, 0.74f + 0.14f * day, 0.86f + 0.09f * day, 1f)
+        if (weatherNight) GLES20.glClearColor(0.07f, 0.10f, 0.18f, 1f)
+        else if (weatherCloudy) GLES20.glClearColor(0.56f, 0.61f, 0.65f, 1f)
+        else GLES20.glClearColor(0.62f + 0.18f * day, 0.74f + 0.14f * day, 0.86f + 0.09f * day, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         GLES20.glUseProgram(program)
         GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uMvp"), 1, false, mvp, 0)

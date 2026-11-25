@@ -12,8 +12,8 @@ android {
         applicationId = "com.dawoyan.mariamland"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.3.6"
+        versionCode = 11
+        versionName = "0.3.7"
     }
 
     buildTypes {

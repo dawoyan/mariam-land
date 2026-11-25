@@ -108,7 +108,7 @@ fun View3DScreen(vm: AppViewModel) {
     var cutaway by remember { mutableStateOf(true) }
     val hidden = vm.hidden + if (cutaway) setOf(com.dawoyan.roomik.core.Layer.ROOF) else emptySet()
     var ghost by remember { mutableStateOf(false) }
-    fun meshFor(h: Set<com.dawoyan.roomik.core.Layer>) = shown?.let { Mesh.build(root, it, it, markClashes = true, hidden = h, residentFloor = floorNo) } ?: Mesh.build(root, root.floors.size, markClashes = true, hidden = h, residentFloor = floorNo)
+    fun meshFor(h: Set<com.dawoyan.roomik.core.Layer>, step: Int = 0) = shown?.let { Mesh.build(root, it, it, markClashes = true, hidden = h, residentFloor = floorNo, residentStep = step) } ?: Mesh.build(root, root.floors.size, markClashes = true, hidden = h, residentFloor = floorNo, residentStep = step)
     val renderer = remember(root, shown) {
         val mesh = meshFor(hidden)
         // "Low walls" cuts the top storey shown, not the one being edited
@@ -143,12 +143,13 @@ fun View3DScreen(vm: AppViewModel) {
     if (photosOpen) SidePhotosDialog(root.id, onChanged = { photoTick++ }) { photosOpen = false }
     // layers turned on or off: the same view gets the new mesh, so the camera stays
     LaunchedEffect(renderer, ghost) { renderer.ghost = ghost; view.requestRender() }
-    var builtFor by remember(renderer) { mutableStateOf(hidden) }
     LaunchedEffect(renderer, hidden) {
-        if (hidden == builtFor) return@LaunchedEffect
-        val m = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { meshFor(hidden) }
-        builtFor = hidden
-        renderer.swap(m); view.requestRender()
+        var step = 0
+        while (true) {
+            val m = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { meshFor(hidden, step++) }
+            renderer.swap(m); view.requestRender()
+            kotlinx.coroutines.delay(500)
+        }
     }
     // Opened from a room ("View inside" in the editor, or from elektronik): start inside it.
     LaunchedEffect(renderer) {

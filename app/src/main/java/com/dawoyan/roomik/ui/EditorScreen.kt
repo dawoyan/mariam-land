@@ -1516,7 +1516,7 @@ private fun PlanCanvas(vm: AppViewModel, ed: EditorState, plan: Plan, rooms: Lis
                                 }
                                 // Every electrical load is routed now. A lamp is routed through its selected switch,
                                 // rather than leaving only a direct visual control-link.
-                                val (it, laid) = if (ed.pointKind == PointKind.SOCKET || ed.pointKind == PointKind.APPLIANCE || ed.pointKind == PointKind.LAMP)
+                                val (it, laid) = if (ed.category == Tool.INTERIOR && ed.pointKind == PointKind.LAMP) placed to 0 else if (ed.pointKind == PointKind.SOCKET || ed.pointKind == PointKind.APPLIANCE || ed.pointKind == PointKind.LAMP)
                                     Autoroute.join(placed, listOf(placed.points.last().id), ed.routeLevel, vm.root, vm.floor) else placed to 0
                                 if (ed.pointKind == PointKind.LAMP) DebugLog.add("electric: lamp #${placed.points.last().id} routed cables=$laid")
                                 vm.commit(it, before); ed.sel = Sel.PointSel(placed.points.last().id)
@@ -3101,6 +3101,10 @@ private fun SelectionPanel(vm: AppViewModel, ed: EditorState, plan: Plan, rooms:
                         FilterChip(ed.systemMode == "radiator", onClick = { ed.systemMode = "radiator"; ed.pipePts = emptyList() }, label = { Text(stringResource(R.string.f_radiator)) })
                         FilterChip(ed.systemMode == "warm", onClick = { ed.systemMode = "warm"; ed.pipePts = emptyList() }, label = { Text(stringResource(R.string.warm_floor)) })
                     }
+                    rowTool == Tool.ELECTRIC && ed.category == Tool.INTERIOR -> {
+                        FilterChip(true, onClick = { ed.tool = Tool.INTERIOR; ed.pointKind = null }, label = { Text("💡 " + stringResource(R.string.lamp) + " ✓") })
+                        Text("Нажмите внутри комнаты, чтобы поставить свет", modifier = Modifier.align(Alignment.CenterVertically))
+                    }
                     rowTool == Tool.ELECTRIC -> {
                         FilterChip(Layer.ELECTRIC !in vm.hidden, onClick = { vm.hidden = if (Layer.ELECTRIC in vm.hidden) vm.hidden - Layer.ELECTRIC else vm.hidden + Layer.ELECTRIC },
                             label = { Text("⚡") }, leadingIcon = { Icon(if (Layer.ELECTRIC in vm.hidden) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, Modifier.size(16.dp)) })
@@ -3111,6 +3115,11 @@ private fun SelectionPanel(vm: AppViewModel, ed: EditorState, plan: Plan, rooms:
                         CableTotalsChip(vm.root ?: plan, plan)
                     }
                     else -> {
+                        if (rowTool == Tool.INTERIOR) FilterChip(false, onClick = {
+                            finishDrawing(vm, ed); ed.tool = Tool.ELECTRIC; ed.pointKind = PointKind.LAMP
+                            ed.itemKind = null; ed.yardKind = null; ed.cableMode = false; ed.sel = null
+                            vm.hidden = vm.hidden - Layer.ELECTRIC
+                        }, label = { Text("💡 " + stringResource(R.string.lamp)) })
                         // indoors (furniture by group) or the yard (canopies, gazebo…), chosen here; the ground opens on the yard
                         val outside = rowTool == Tool.YARD || ed.outdoor ?: (vm.floor == SITE)
                         FilterChip(!outside, onClick = { ed.outdoor = false; ed.yardKind = null }, label = { Text("🛋 " + stringResource(R.string.tool_interior)) })

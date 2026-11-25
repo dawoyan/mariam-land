@@ -27,6 +27,7 @@ class Mesh(
     val groundCount: Int = 6,
     /** Height of the ground, metres. */
     val groundY: Float = 0f,
+    val residentParts: List<IntRange> = emptyList(),
 ) {
     val vertexCount: Int get() = data.size / STRIDE
 
@@ -81,6 +82,7 @@ class Mesh(
             val low = from.coerceIn(-root.basements.size, top)
             val shown = low..top
             val lights = ArrayList<Light>()
+            val residentParts = ArrayList<IntRange>()
             var midX = 0f; var midZ = 0f; var kind = KIND_PLAIN; var room = -1; var base = 0f; var baseDm = 0
             fun v(p: P, y: Float, nx: Float, ny: Float, nz: Float, c: Int) {
                 target += (p.x / 1000).toFloat(); target += y + base; target += (p.y / 1000).toFloat()
@@ -244,8 +246,11 @@ class Mesh(
                 val stride = kotlin.math.sin(residentStep * Math.PI / 4) * 105.0
                 val bob = (kotlin.math.abs(kotlin.math.sin(residentStep * Math.PI / 4)) * 0.025).toFloat()
                 kind = KIND_PLAIN; room = -1
-                fun part(dx: Double, dy: Double, w: Double, d: Double, y0: Float, y1: Float, color: Int) =
+                fun part(dx: Double, dy: Double, w: Double, d: Double, y0: Float, y1: Float, color: Int) {
+                    val start = out.size / STRIDE
                     box(rect(p + P(dx, dy), P(1.0, 0.0), w / 2, d / 2), y0, y1, color)
+                    residentParts += start until (out.size / STRIDE)
+                }
                 part(-90.0, stride, 130.0, 180.0, 0f, .75f, 0x344866)
                 part(90.0, -stride, 130.0, 180.0, 0f, .75f, 0x344866)
                 part(0.0, 0.0, 340.0, 200.0, .75f, 1.35f + bob, 0xD96375)
@@ -660,7 +665,7 @@ class Mesh(
             }
             val open = out.size / STRIDE
             out.addAll(ceilings)
-            return Mesh(out.toFloatArray(), minX, minZ, maxX, maxZ, root.elevation(top) / 1000f + root.floor(top).wallHeight / 1000f, open, lights, ground, groundY)
+            return Mesh(out.toFloatArray(), minX, minZ, maxX, maxZ, root.elevation(top) / 1000f + root.floor(top).wallHeight / 1000f, open, lights, ground, groundY, residentParts)
         }
     }
 }

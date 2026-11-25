@@ -42,6 +42,7 @@ import androidx.compose.foundation.rememberScrollState
 import com.dawoyan.roomik.core.floorRange
 import com.dawoyan.roomik.core.floor
 import com.dawoyan.roomik.core.allFloors
+import com.dawoyan.roomik.core.groundFloor
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Lightbulb
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dawoyan.roomik.AppViewModel
 import com.dawoyan.roomik.R
@@ -102,7 +104,7 @@ fun View3DScreen(vm: AppViewModel) {
     // What is shown: the whole house (null), or one floor on its own. Walking inside is on that floor, or on the one
     // being edited when the whole house is shown.
     var shown by remember { mutableStateOf<Int?>(if (root.floors.isEmpty() && root.basements.isEmpty()) vm.floor else null) }
-    val floorNo = shown ?: vm.floor
+    val floorNo = (shown ?: vm.floor).let { if (it == com.dawoyan.roomik.core.SITE) root.groundFloor else it }
     val plan = root.floor(floorNo)
     // with a roof the house is first seen whole; low walls take the roof off to look in
     var cutaway by remember { mutableStateOf(true) }
@@ -145,22 +147,21 @@ fun View3DScreen(vm: AppViewModel) {
     if (photosOpen) SidePhotosDialog(root.id, onChanged = { photoTick++ }) { photosOpen = false }
     // layers turned on or off: the same view gets the new mesh, so the camera stays
     LaunchedEffect(renderer, ghost) { renderer.ghost = ghost; view.requestRender() }
-    LaunchedEffect(renderer, hidden, followResident) {
-        var step = 0
-        if (followResident) renderer.startFollowing()
-        while (true) {
-            val frame = step++
-            val (m, position) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { meshFor(hidden, frame) to Mesh.residentPosition(plan, frame) }
-            if (followResident && !renderer.inside) position?.let { renderer.follow(it) }
-            renderer.swap(m); view.requestRender()
-            kotlinx.coroutines.delay(250)
-        }
+    LaunchedEffect(renderer, hidden) {
+        val m = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { meshFor(hidden) }
+        renderer.swap(m); view.requestRender()
     }
+    LaunchedEffect(renderer, followResident) { renderer.followResident = followResident; if (followResident) renderer.startFollowing() }
     // Opened from a room ("View inside" in the editor, or from elektronik): start inside it.
     LaunchedEffect(renderer) {
         vm.insideAt?.let { at -> vm.insideAt = null; if (renderer.goInside(P(at.x / 1000, at.y / 1000))) { inside = true; view.requestRender() } }
     }
     val owner = LocalLifecycleOwner.current
+    LaunchedEffect(owner, view) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) { withFrameNanos { }; view.requestRender() }
+        }
+    }
     DisposableEffect(owner, view) {
         val obs = LifecycleEventObserver { _, e ->
             if (e == Lifecycle.Event.ON_PAUSE) view.onPause() else if (e == Lifecycle.Event.ON_RESUME) view.onResume()
@@ -341,6 +342,10 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
     @Volatile var weatherSnow = false
     @Volatile var weatherNight = false
     @Volatile var weatherCloudy = false
+    @Volatile var followResident = true
+    private val residentStart = Mesh.residentPosition(plan, 0)
+    private val residentEnd = Mesh.residentPosition(plan, 40)
+    private val animationStart = android.os.SystemClock.elapsedRealtime()
     private val span = max(mesh.maxX - mesh.minX, mesh.maxZ - mesh.minZ)
     @Volatile private var yaw = 25f
     @Volatile private var pitch = 50f
@@ -710,6 +715,26 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
             nextMesh = null
             mesh = m
             buffer = ByteBuffer.allocateDirect(m.data.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(m.data); position(0) }
+        }
+        val a = residentStart; val b = residentEnd
+        if (a != null && b != null && mesh.residentParts.isNotEmpty()) {
+            val seconds = (android.os.SystemClock.elapsedRealtime() - animationStart) / 1000.0
+            val phase = seconds * Math.PI / 5.0
+            val t = (1.0 - cos(phase)) * .5
+            val dx = ((b.x - a.x) * t / 1000).toFloat()
+            val dz = ((b.y - a.y) * t / 1000).toFloat()
+            val walk = sin(seconds * 7.0).toFloat()
+            val bob = kotlin.math.abs(walk) * .018f
+            mesh.residentParts.forEachIndexed { index, range ->
+                val swing = when (index) { 0, 4 -> walk * .09f; 1, 3 -> -walk * .09f; else -> 0f }
+                for (v in range) {
+                    val k = v * Mesh.STRIDE
+                    buffer.put(k, mesh.data[k] + dx)
+                    buffer.put(k + 1, mesh.data[k + 1] + if (index >= 2) bob else 0f)
+                    buffer.put(k + 2, mesh.data[k + 2] + dz + swing)
+                }
+            }
+            if (followResident && !inside) follow(P(a.x + dx * 1000, a.y + dz * 1000))
         }
         val ghostOn = ghost && !inside
         val proj = FloatArray(16); val viewM = FloatArray(16); val mvp = FloatArray(16)

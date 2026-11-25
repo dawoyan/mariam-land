@@ -375,7 +375,7 @@
     <string name="model_parts">Parts</string>
     <string name="model_parts_about">⬒ is the top seen from above (a roof sheet, a deck), Σ the whole surface; sizes are width × depth × height.</string>
     <string name="model_placed">Model “%s” on the plan</string>
-    <string name="model_bad">This file has no 3D model Roomik can read (3MF, STL or OBJ)</string>
+    <string name="model_bad">This file has no 3D model Mariam Land can read (3MF, STL or OBJ)</string>
     <string name="open_plan_first">Model received: open a plan and it is put on it</string>
     <string name="models_sec">3D models (top area ⬒ per part)</string>
     <string name="y_canopy">Shelter</string>
@@ -480,7 +480,7 @@
     <string name="asset_added">“%s” added to 3D assets (Interior → 📦 3D assets)</string>
     <string name="asset_tap">Tap where “%s” goes</string>
     <string name="asset_where">Put it on</string>
-    <string name="assets_empty">No 3D assets yet. Send a model from Idea 3D (Export 3D → Roomik) or add a 3MF / STL / OBJ file.</string>
+    <string name="assets_empty">No 3D assets yet. Add a 3MF / STL / OBJ file.</string>
     <string name="asset_insert">Insert</string>
     <string name="asset_from_file">File</string>
     <string name="asset_delete_q">Remove this model from the library? Copies already on plans stay.</string>

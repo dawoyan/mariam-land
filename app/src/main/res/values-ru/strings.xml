@@ -375,7 +375,7 @@
     <string name="model_parts">Части</string>
     <string name="model_parts_about">⬒ — вид сверху (кровельный лист, настил), Σ — вся поверхность; размеры: ширина × глубина × высота.</string>
     <string name="model_placed">Модель «%s» на плане</string>
-    <string name="model_bad">В файле нет 3D-модели, которую Roomik может прочитать (3MF, STL или OBJ)</string>
+    <string name="model_bad">В файле нет 3D-модели, которую Mariam Land может прочитать (3MF, STL или OBJ)</string>
     <string name="open_plan_first">Модель получена: откройте план, и она появится на нём</string>
     <string name="models_sec">3D-модели (площадь сверху ⬒ по частям)</string>
     <string name="y_canopy">Навес</string>
@@ -480,7 +480,7 @@
     <string name="asset_added">«%s» добавлена в 3D-модели (Интерьер → 📦 3D-модели)</string>
     <string name="asset_tap">Коснитесь, куда поставить «%s»</string>
     <string name="asset_where">Куда</string>
-    <string name="assets_empty">Пока нет 3D-моделей. Отправьте модель из Idea 3D (Экспорт 3D → Roomik) или добавьте файл 3MF / STL / OBJ.</string>
+    <string name="assets_empty">Пока нет 3D-моделей. Добавьте файл 3MF / STL / OBJ.</string>
     <string name="asset_insert">Вставить</string>
     <string name="asset_from_file">Файл</string>
     <string name="asset_delete_q">Убрать модель из библиотеки? Копии на планах останутся.</string>

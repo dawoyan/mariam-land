@@ -415,6 +415,7 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
     @Volatile var followResident = true
     private val residentRoute = mesh.residentRoute
     private val animationStart = android.os.SystemClock.elapsedRealtime()
+    private var residentHeading = 0.0
     private val span = max(mesh.maxX - mesh.minX, mesh.maxZ - mesh.minZ)
     @Volatile private var yaw = 25f
     @Volatile private var pitch = 50f
@@ -804,10 +805,16 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
             }
             var remaining = distance * t
             var current = path.firstOrNull() ?: a
+            var direction: P? = null
             for (i in lengths.indices) {
                 val length = lengths[i]
-                if (remaining <= length && length > 0) { current = path[i] + (path[i + 1] - path[i]) * (remaining / length); break }
+                if (remaining <= length && length > 0) { current = path[i] + (path[i + 1] - path[i]) * (remaining / length); direction = path[i + 1] - path[i]; break }
                 remaining -= length; current = path[i + 1]
+            }
+            if (moving && direction != null && direction.len > 0.01) {
+                val reversing = command == null && cycle >= duration + 4.0
+                val d = if (reversing) direction * -1.0 else direction
+                residentHeading = kotlin.math.atan2(d.x, d.y)
             }
             val sleeping = command?.action == "sleep" && !moving
             if (sleeping && command?.objectAt != null) current = command.objectAt
@@ -817,13 +824,20 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
             val vacuuming = command?.action == "vacuum" && !moving && seconds < duration + 5.0
             val walk = if (moving || vacuuming) sin(seconds * 4.0).toFloat() else 0f
             val bob = if (moving) kotlin.math.abs(walk) * .012f else (sin(seconds * 1.5) * .004).toFloat()
+            val ca = cos(residentHeading).toFloat(); val sa = sin(residentHeading).toFloat()
             mesh.residentParts.forEachIndexed { index, range ->
                 val swing = when (index) { 0, 4 -> walk * .09f; 1, 3 -> -walk * .09f; else -> 0f }
                 for (v in range) {
                     val k = v * Mesh.STRIDE
-                    buffer.put(k, mesh.data[k] + dx)
+                    val localX = mesh.data[k] - (a.x / 1000).toFloat()
+                    val localZ = mesh.data[k + 2] - (a.y / 1000).toFloat() + swing
+                    val rotatedX = localX * ca + localZ * sa
+                    val rotatedZ = -localX * sa + localZ * ca
+                    buffer.put(k, (a.x / 1000).toFloat() + dx + rotatedX)
                     buffer.put(k + 1, if (sleeping) base + .52f + (mesh.data[k + 2] - (a.y / 1000).toFloat()) * .35f else mesh.data[k + 1] + if (index >= 2) bob else 0f)
-                    buffer.put(k + 2, if (sleeping) (current.y / 1000).toFloat() + (mesh.data[k + 1] - base) * .8f - .65f else mesh.data[k + 2] + dz + swing)
+                    buffer.put(k + 2, if (sleeping) (current.y / 1000).toFloat() + (mesh.data[k + 1] - base) * .8f - .65f else (a.y / 1000).toFloat() + dz + rotatedZ)
+                    buffer.put(k + 3, mesh.data[k + 3] * ca + mesh.data[k + 5] * sa)
+                    buffer.put(k + 5, -mesh.data[k + 3] * sa + mesh.data[k + 5] * ca)
                 }
             }
             if (followResident && !inside) follow(P(a.x + dx * 1000, a.y + dz * 1000))

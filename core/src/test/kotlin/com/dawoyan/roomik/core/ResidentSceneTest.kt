@@ -84,4 +84,19 @@ class ResidentSceneTest {
         assertTrue(route.size > 1)
         assertTrue((route.last() - P(4000.0, 2000.0)).len < 500)
     }
+
+    @Test fun reachesHouseFromFarOutsideThroughDoor() {
+        var plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 5000, 4000)
+        plan = assertNotNull(PlanOps.addOpening(plan, OpeningKind.DOOR, P(2500.0, 0.0), 500.0))
+        val route = ResidentNavigation.route(plan, P(2500.0, -4500.0), P(3000.0, 2500.0))
+        assertTrue(route.size > 2)
+        assertTrue(route.zipWithNext().all { (a, b) -> Interior.canWalk(plan, a, b) })
+        assertTrue((route.last() - P(3000.0, 2500.0)).len < 500)
+    }
+
+    @Test fun closedOffTargetIsNotConsideredReachedAcrossWall() {
+        var plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 4000, 4000)
+        plan = PlanOps.addRect(plan, 4000, 0, 8000, 4000)
+        assertTrue(ResidentNavigation.route(plan, P(3600.0, 2000.0), P(4300.0, 2000.0)).isEmpty())
+    }
 }

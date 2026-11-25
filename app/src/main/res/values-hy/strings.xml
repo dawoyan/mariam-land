@@ -375,7 +375,7 @@
     <string name="model_parts">Մասեր</string>
     <string name="model_parts_about">⬒ — վերևից տեսքը (տանիքի թիթեղ, հատակ), Σ — ամբողջ մակերեսը. չափերը՝ լայնություն × խորություն × բարձրություն։</string>
     <string name="model_placed">«%s» մոդելը հատակագծում է</string>
-    <string name="model_bad">Ֆայլում չկա 3D մոդել, որը Roomik-ը կարող է կարդալ (3MF, STL կամ OBJ)</string>
+    <string name="model_bad">Ֆայլում չկա 3D մոդել, որը Mariam Land-ը կարող է կարդալ (3MF, STL կամ OBJ)</string>
     <string name="open_plan_first">Մոդելը ստացված է. բացեք հատակագիծը, և այն կհայտնվի դրա վրա</string>
     <string name="models_sec">3D մոդելներ (վերևի մակերեսը ⬒ ըստ մասերի)</string>
     <string name="y_canopy">Ծածկ</string>
@@ -480,7 +480,7 @@
     <string name="asset_added">«%s»-ը ավելացվեց 3D մոդելներում (Ինտերիեր → 📦 3D մոդելներ)</string>
     <string name="asset_tap">Հպեք, թե ուր դնել «%s»-ը</string>
     <string name="asset_where">Ուր</string>
-    <string name="assets_empty">3D մոդելներ դեռ չկան։ Ուղարկեք Idea 3D-ից (Export 3D → Roomik) կամ ավելացրեք 3MF / STL / OBJ ֆայլ։</string>
+    <string name="assets_empty">3D մոդելներ դեռ չկան։ Ավելացրեք 3MF / STL / OBJ ֆայլ։</string>
     <string name="asset_insert">Տեղադրել</string>
     <string name="asset_from_file">Ֆայլ</string>
     <string name="asset_delete_q">Հեռացնե՞լ մոդելը գրադարանից։ Պլանների վրա պատճենները կմնան։</string>

@@ -61,25 +61,33 @@ object ResidentNavigation {
                 .minByOrNull { (at(it) - outside).len }
             inside?.let { outside to it }
         }.firstOrNull()
-        val requestedStart = from?.let { pos -> valid.indices.asSequence().filter { valid[it] && (at(it) - pos).len < 2000 && canWalk(pos, at(it)) && furniture.none { f -> !Geo.inside(pos, f) && (1..4).any { k -> Geo.inside(pos + (at(it) - pos) * (k / 5.0), f) } } }.minByOrNull { (at(it) - pos).len } }
+        val outsideApproach = from?.let { pos -> entry?.takeIf { (outside, _) ->
+            rooms.none { Geo.inside(pos, it.polygon) } && canWalk(pos, outside) &&
+                furniture.none { f -> (1..10).any { k -> Geo.inside(pos + (outside - pos) * (k / 10.0), f) } }
+        } }
+        val requestedStart = from?.let { pos -> valid.indices.asSequence().filter { valid[it] && (at(it) - pos).len < 2000 && canWalk(pos, at(it)) && furniture.none { f -> !Geo.inside(pos, f) && (1..4).any { k -> Geo.inside(pos + (at(it) - pos) * (k / 5.0), f) } } }.minByOrNull { (at(it) - pos).len } } ?: outsideApproach?.second
         if (from != null && requestedStart == null) return emptyList()
         val start = requestedStart ?: entry?.second ?: valid.indices.filter { valid[it] && Geo.inside(at(it), startRoom.polygon) }.minByOrNull { (at(it) - startRoom.anchor).len } ?: return listOf(startRoom.anchor)
         val parents = IntArray(valid.size) { -1 }; val queue = ArrayDeque<Int>(); queue.add(start); parents[start] = start
         while (queue.isNotEmpty()) {
             val i = queue.removeFirst(); val x = i % nx; val y = i / nx
-            for ((xx, yy) in listOf(x - 1 to y, x + 1 to y, x to y - 1, x to y + 1, x - 2 to y, x + 2 to y, x to y - 2, x to y + 2)) {
+            for ((xx, yy) in (1..4).flatMap { d -> listOf(x - d to y, x + d to y, x to y - d, x to y + d) }) {
                 if (xx !in 0 until nx || yy !in 0 until ny) continue
                 val n = yy * nx + xx
                 if (!valid[n] || parents[n] >= 0) continue
-                val longStep = kotlin.math.abs(xx - x) + kotlin.math.abs(yy - y) == 2
-                val middle = (at(i) + at(n)) * .5
-                val crossesWall = longStep && walls.any { (wall, a, b) -> Geo.distToSegment(middle, a, b) < wall.thickness / 2.0 + 25 }
-                if ((!longStep || crossesWall && furniture.none { Geo.inside(middle, it) }) && canWalk(at(i), at(n))) { parents[n] = i; queue.add(n) }
+                val longStep = kotlin.math.abs(xx - x) + kotlin.math.abs(yy - y) > 1
+                val crossesWall = longStep && walls.any { (_, a, b) -> Geo.intersect(at(i), at(n), a, b) != null }
+                val blockedByFurniture = longStep && furniture.any { f -> (1..9).any { k -> Geo.inside(at(i) + (at(n) - at(i)) * (k / 10.0), f) } }
+                if ((!longStep || crossesWall && !blockedByFurniture) && canWalk(at(i), at(n))) { parents[n] = i; queue.add(n) }
             }
         }
         val reachable = valid.indices.filter { parents[it] >= 0 }
         val targets = plan.items.filter { it.kind in setOf("fridge", "toilet", "bed", "bed1", "sofa", "chair") }
-        val requestedEnd = destination?.let { target -> reachable.minByOrNull { (at(it) - target).len }?.takeIf { (at(it) - target).len < 1600.0 } }
+        val requestedEnd = destination?.let { target ->
+            val targetRoom = rooms.firstOrNull { Geo.inside(target, it.polygon) }
+            reachable.asSequence().filter { targetRoom == null || Geo.inside(at(it), targetRoom.polygon) }
+                .minByOrNull { (at(it) - target).len }?.takeIf { (at(it) - target).len < 1600.0 }
+        }
         if (destination != null && requestedEnd == null) return emptyList()
         val end = requestedEnd ?: targets.mapNotNull { item ->
             val p = P(item.x.toDouble(), item.y.toDouble())
@@ -89,6 +97,7 @@ object ResidentNavigation {
         val result = mutableListOf<Int>(); var i = end
         while (i != start) { result.add(i); i = parents[i] }
         result.add(start); result.reverse()
-        return listOfNotNull(if (from != null) from else entry?.first) + result.map(::at)
+        val approach = if (from != null) listOfNotNull(from, outsideApproach?.first?.takeIf { requestedStart == outsideApproach.second }) else listOfNotNull(entry?.first)
+        return approach + result.map(::at)
     }
 }

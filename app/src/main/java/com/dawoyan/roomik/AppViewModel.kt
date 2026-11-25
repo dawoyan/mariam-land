@@ -159,10 +159,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val undo = ArrayDeque<Pair<Plan, Int>>()
     private val redo = ArrayDeque<Pair<Plan, Int>>()
 
-    init {
-        // This must be after undo/redo are created: open() clears their history.
-        // Return straight to the project the person was editing, rather than making them choose it again.
-        prefs.getString("lastProject", null)?.let { id -> plans.firstOrNull { it.id == id } }?.let(::open)
+    private var restored = false
+    fun restoreLastProject() {
+        if (restored) return
+        restored = true
+        // Restore only after construction has finished; keep saved files intact if restoration fails.
+        prefs.getString("lastProject", null)?.let { id -> plans.firstOrNull { it.id == id } }?.let { project ->
+            runCatching { open(project) }.onFailure { android.util.Log.e("MariamLand", "Saved house could not be opened", it) }
+        }
     }
 
     private fun load(): List<Plan> = (dir.listFiles { f -> f.name.endsWith(".json") } ?: emptyArray())

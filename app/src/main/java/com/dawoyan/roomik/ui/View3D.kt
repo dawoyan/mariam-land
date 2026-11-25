@@ -719,12 +719,21 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
         val a = residentStart; val b = residentEnd
         if (a != null && b != null && mesh.residentParts.isNotEmpty()) {
             val seconds = (android.os.SystemClock.elapsedRealtime() - animationStart) / 1000.0
-            val phase = seconds * Math.PI / 5.0
-            val t = (1.0 - cos(phase)) * .5
+            val distance = kotlin.math.hypot(b.x - a.x, b.y - a.y) / 1000.0
+            val duration = (distance / .35).coerceAtLeast(3.0)
+            val period = 2 * duration + 8.0
+            val cycle = seconds % period
+            val moving = (cycle < duration || cycle >= duration + 4.0 && cycle < 2 * duration + 4.0) && distance > .1
+            val t = when {
+                cycle < duration -> cycle / duration
+                cycle < duration + 4.0 -> 1.0
+                cycle < 2 * duration + 4.0 -> 1.0 - (cycle - duration - 4.0) / duration
+                else -> 0.0
+            }
             val dx = ((b.x - a.x) * t / 1000).toFloat()
             val dz = ((b.y - a.y) * t / 1000).toFloat()
-            val walk = sin(seconds * 7.0).toFloat()
-            val bob = kotlin.math.abs(walk) * .018f
+            val walk = if (moving) sin(seconds * 4.0).toFloat() else 0f
+            val bob = if (moving) kotlin.math.abs(walk) * .012f else (sin(seconds * 1.5) * .004).toFloat()
             mesh.residentParts.forEachIndexed { index, range ->
                 val swing = when (index) { 0, 4 -> walk * .09f; 1, 3 -> -walk * .09f; else -> 0f }
                 for (v in range) {

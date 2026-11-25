@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        vm.restoreLastProject()
         if (savedInstanceState == null) take(intent)
         setContent {
             val scheme = if (isSystemInDarkTheme()) darkColorScheme(primary = Color(0xFF8FCBE6), secondary = Color(0xFFFFC857))

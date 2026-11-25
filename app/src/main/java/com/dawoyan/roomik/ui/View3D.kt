@@ -105,10 +105,10 @@ fun View3DScreen(vm: AppViewModel) {
     val floorNo = shown ?: vm.floor
     val plan = root.floor(floorNo)
     // with a roof the house is first seen whole; low walls take the roof off to look in
-    var cutaway by remember { mutableStateOf(root.allFloors.none { it.roofs.isNotEmpty() }) }
+    var cutaway by remember { mutableStateOf(true) }
     val hidden = vm.hidden + if (cutaway) setOf(com.dawoyan.roomik.core.Layer.ROOF) else emptySet()
     var ghost by remember { mutableStateOf(false) }
-    fun meshFor(h: Set<com.dawoyan.roomik.core.Layer>) = shown?.let { Mesh.build(root, it, it, markClashes = true, hidden = h) } ?: Mesh.build(root, root.floors.size, markClashes = true, hidden = h)
+    fun meshFor(h: Set<com.dawoyan.roomik.core.Layer>) = shown?.let { Mesh.build(root, it, it, markClashes = true, hidden = h, residentFloor = floorNo) } ?: Mesh.build(root, root.floors.size, markClashes = true, hidden = h, residentFloor = floorNo)
     val renderer = remember(root, shown) {
         val mesh = meshFor(hidden)
         // "Low walls" cuts the top storey shown, not the one being edited

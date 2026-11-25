@@ -48,7 +48,7 @@ class Mesh(
          * vertex data also carries the floor's base height: kind + 10 × base in decimetres.
          */
         /** Floors [from]..[upTo] of [root]; by default from the lowest basement. */
-        fun build(root: Plan, upTo: Int = 0, from: Int = Int.MIN_VALUE, markClashes: Boolean = false, hidden: Set<Layer> = emptySet()): Mesh {
+        fun build(root: Plan, upTo: Int = 0, from: Int = Int.MIN_VALUE, markClashes: Boolean = false, hidden: Set<Layer> = emptySet(), residentFloor: Int? = null): Mesh {
             val out = ArrayList<Float>(8192)
             val ceilings = ArrayList<Float>(1024)
             var target = out
@@ -211,6 +211,21 @@ class Mesh(
                 if (!onSite && (fi != -root.basements.size || low > fi)) for ((a, b, cc) in fill) { v(cc, -SLAB / 1000f, 0f, -1f, 0f, 0xFAF8F4); v(b, -SLAB / 1000f, 0f, -1f, 0f, 0xFAF8F4); v(a, -SLAB / 1000f, 0f, -1f, 0f, 0xFAF8F4) }
                 val c = Palette.floor(r, index)
                 for ((a, b, cc) in fill) { v(a, 0f, 0f, 1f, 0f, c); v(b, 0f, 0f, 1f, 0f, c); v(cc, 0f, 0f, 1f, 0f, c) }
+            }
+
+            // A simple in-scene resident, on the selected floor rather than in the saved house model.
+            if (fi == residentFloor && rooms.isNotEmpty()) {
+                val p = rooms.maxByOrNull { it.area }!!.anchor
+                kind = KIND_PLAIN; room = -1
+                fun part(dx: Double, dy: Double, w: Double, d: Double, y0: Float, y1: Float, color: Int) =
+                    box(rect(p + P(dx, dy), P(1.0, 0.0), w / 2, d / 2), y0, y1, color)
+                part(-90.0, 0.0, 130.0, 180.0, 0f, .75f, 0x344866)
+                part(90.0, 0.0, 130.0, 180.0, 0f, .75f, 0x344866)
+                part(0.0, 0.0, 370.0, 210.0, .75f, 1.35f, 0xD96375)
+                part(-250.0, 0.0, 110.0, 140.0, .82f, 1.3f, 0xDDAA88)
+                part(250.0, 0.0, 110.0, 140.0, .82f, 1.3f, 0xDDAA88)
+                part(0.0, 0.0, 260.0, 230.0, 1.35f, 1.65f, 0xE6B392)
+                part(0.0, 0.0, 280.0, 250.0, 1.65f, 1.75f, 0x44352E)
             }
 
             // A plinth under the ground floor's walls, down to the ground when the house stands above it.

@@ -99,6 +99,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
     Surface(color = Color.Transparent, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(painterResource(portrait), contentDescription = name, modifier = Modifier.height(64.dp).clickable { dialog = true })
                 Text("$face $name · $happiness%", modifier = Modifier.weight(1f).clickable { dialog = true }, style = MaterialTheme.typography.labelLarge)
                 TextButton(onClick = { careOpen = true }) { Text("🌱 🐕") }
                 TextButton(onClick = { dialog = true }) { Text("💬") }
@@ -123,9 +124,15 @@ fun HumanoidCompanion(vm: AppViewModel) {
         var tick by remember { mutableStateOf(System.currentTimeMillis()) }
         var dog by remember { mutableStateOf(prefs.getBoolean("dog", false)) }
         var fed by remember { mutableStateOf(prefs.getLong("dog_fed", 0L)) }
+        var robot by remember { mutableStateOf(prefs.getBoolean("robot_vacuum", false)) }
+        var cleaned by remember { mutableStateOf(prefs.getLong("cleaned", 0L)) }
         androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); tick = System.currentTimeMillis() } }
         AlertDialog(onDismissRequest = { careOpen = false }, title = { Text("Уход за домом") }, text = {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Text(if (cleaned == 0L || tick - cleaned > 24 * 3600000L) "🏠 Пора пропылесосить" else "✨ Пол чистый")
+                TextButton(onClick = { cleaned = tick; prefs.edit().putLong("cleaned", tick).apply(); speak("Я пропылесосила дом.") }) { Text("🧹 Попросить пропылесосить") }
+                if (!robot) TextButton(onClick = { robot = true; prefs.edit().putBoolean("robot_vacuum", true).apply() }) { Text("🤖 Получить робот-пылесос (бесплатно)") }
+                else TextButton(onClick = { cleaned = tick; prefs.edit().putLong("cleaned", tick).apply() }) { Text("🤖 Включить робот-пылесос") }
                 if (trees.isEmpty()) Text("Посадите дерево во дворе: 🌿 → 🌱 Посадить дерево → нажмите на землю.")
                 trees.forEach { tree ->
                     val key = "tree_${root?.id}_${tree.id}"

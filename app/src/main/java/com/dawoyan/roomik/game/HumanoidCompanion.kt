@@ -51,7 +51,7 @@ import com.dawoyan.roomik.core.allFloors
 import java.util.Locale
 
 private data class HomeProgress(val bedrooms: Int, val toilet: Boolean, val kitchen: Boolean, val lights: Int, val yard: Boolean) {
-    val score: Int get() = (bedrooms.coerceAtMost(3) * 18) + if (toilet) 18 else 0 + if (kitchen) 22 else 0 + (lights.coerceAtMost(3) * 2) + if (yard) 6 else 0
+    val score: Int get() = (bedrooms.coerceAtMost(3) * 18) + (if (toilet) 18 else 0) + (if (kitchen) 22 else 0) + (lights.coerceAtMost(3) * 2) + (if (yard) 6 else 0)
     val complete: Boolean get() = bedrooms >= 3 && toilet && kitchen && lights >= 3 && yard
     fun next(): String = when {
         bedrooms < 3 -> "Нужны спальни: $bedrooms из 3. Добавьте комнату и выберите тип «Спальня»."
@@ -80,7 +80,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
         .animateFloat(0f, 5f, infiniteRepeatable(tween(1100, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "resident-breath")
     val name = residentName.ifBlank { if (selected == "boy") "Максим" else "Марьям" }
     val portrait = if (selected == "boy") R.drawable.mariam_guide_boy else R.drawable.mariam_guide
-    val face = when { happiness < 35 || progress.score == 0 -> "😟"; progress.complete && happiness >= 70 -> "😁"; happiness >= 55 -> "😊"; else -> "🙂" }
+    val face = when { happiness < 35 -> "😟"; happiness >= 70 -> "😁"; happiness >= 55 -> "😊"; else -> "🙂" }
     fun go(destination: String) {
         place = destination
         happiness = (happiness + when (destination) { "Работа" -> -6; "Магазин" -> 8; "Спортзал" -> 6; else -> 2 }).coerceIn(0, 100)
@@ -158,10 +158,21 @@ private fun ResidentDialog(name: String, age: Int, portrait: Int, face: String, 
         icon = { Icon(Icons.Filled.Person, null) },
         title = { Text("$face $name") },
         text = { Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Image(painterResource(portrait), null, Modifier.height(210.dp).graphicsLayer { translationY = bob })
+            var question by remember { mutableStateOf("") }
+            var reply by remember(progress, place) { mutableStateOf(message) }
+            Image(painterResource(portrait), null, Modifier.height(150.dp).graphicsLayer { translationY = bob })
             Text("Вы: Какой дом ты хочешь?")
             Text("$name${if (age > 0) ", $age" else ""}: Я хочу дом с тремя спальнями, двором, кухней, туалетом и светом.")
-            Text(message)
+            Text("$name: $reply")
+            Text("Настроение зависит от поездок: работа снижает его, магазин и спортзал повышают.")
+            OutlinedTextField(question, { question = it }, label = { Text("Спросите жителя") }, singleLine = true)
+            TextButton(onClick = {
+                reply = when {
+                    question.contains("настро", ignoreCase = true) || question.contains("почему", ignoreCase = true) -> "После работы я устаю. Магазин и спортзал улучшают моё настроение. / Աշխատանքից հոգնում եմ, իսկ խանութն ու մարզասրահը բարձրացնում են տրամադրությունս։"
+                    else -> message
+                }
+                speak(reply.substringBefore(" / "))
+            }) { Text("Спросить / Հարցնել") }
             Text("Сейчас: $place")
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 AssistChip(onClick = { go("Дома") }, label = { Text("🏠") })

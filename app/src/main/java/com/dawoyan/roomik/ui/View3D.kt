@@ -157,6 +157,12 @@ fun View3DScreen(vm: AppViewModel) {
     }
     var lightsOn by remember { mutableStateOf(true) }
     var localWeather by remember { mutableStateOf<LocalWeather?>(null) }
+    var controlsExpanded by remember { mutableStateOf(false) }
+    val applyWeather: (LocalWeather) -> Unit = { w ->
+        localWeather = w; renderer.weatherSnow = w.snow
+        renderer.weatherNight = !w.day; renderer.weatherCloudy = w.code >= 3
+        renderer.sun = if (w.day) 0.45f else 0f
+    }
     var followResident by remember { mutableStateOf(false) }
     var fadeToken by remember { mutableStateOf(0) }
     // Each switch controls only the lamps linked to it in the electrical plan.  Values survive recomposition while this view is open.
@@ -279,7 +285,11 @@ fun View3DScreen(vm: AppViewModel) {
                                 val path = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { ResidentNavigation.route(plan, start, destination) }
                                 if (path.isEmpty()) {
                                     residentFeedback = "Не могу туда пройти. Проверьте двери и мебель. / Չեմ կարող հասնել այնտեղ։"
-                                    com.dawoyan.roomik.Diagnostics.record(context, "command_failed action=$action reason=no_route")
+                                    val rs = com.dawoyan.roomik.core.Rooms.detect(plan)
+                                    val startRoom = rs.indexOfFirst { Geo.inside(start, it.polygon) }
+                                    val targetRoom = rs.indexOfFirst { Geo.inside(destination, it.polygon) }
+                                    val attached = Interior.openings(plan).values.flatten().count { it.opening.kind != com.dawoyan.roomik.core.OpeningKind.WINDOW }
+                                    com.dawoyan.roomik.Diagnostics.record(context, "command_failed action=$action floor=$floorNo startRoom=$startRoom targetRoom=$targetRoom rooms=${rs.size} attachedDoors=$attached openings=${plan.openings.size} walls=${plan.walls.size} items=${plan.items.size} reason=no_route")
                                 } else {
                                     renderer.command(path, action, item?.let { P(it.x.toDouble(), it.y.toDouble()) })
                                     residentFeedback = when (action) { "sleep" -> "Иду спать. / Գնում եմ քնելու։"; "vacuum" -> "Иду убираться. / Գնում եմ մաքրելու։"; else -> "Иду туда. / Գնում եմ այնտեղ։" }
@@ -307,15 +317,16 @@ fun View3DScreen(vm: AppViewModel) {
                     FloorChip(stringResource(R.string.whole_house), shown == null, null) { shown = null }
                     for (i in root.floorRange.reversed()) FloorChip(floorName(i, root), shown == i, null) { vm.selectFloor(i); shown = i }
                 }
-            Surface(Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)) {
+            if (!controlsExpanded) {
+                Box(Modifier.size(0.dp)) { LiveWeather { w -> applyWeather(w); view.requestRender() } }
+                AssistChip(onClick = { controlsExpanded = true }, label = { Text("⚙") }, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp))
+            }
+            if (controlsExpanded) Surface(Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                     // what is shown: outer walls faint, and each system on or off
                     Row(Modifier.hScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LiveWeather { w ->
-                            localWeather = w; renderer.weatherSnow = w.snow
-                            renderer.weatherNight = !w.day; renderer.weatherCloudy = w.code >= 3
-                            renderer.sun = if (w.day) 0.45f else 0f; view.requestRender()
-                        }
+                        AssistChip(onClick = { controlsExpanded = false }, label = { Text("✕") })
+                        LiveWeather { w -> applyWeather(w); view.requestRender() }
                         FilterChip(followResident, { followResident = !followResident }, label = { Text("👣 Следить") })
                         // the sun's season, and the photos round the plot
                         for ((d, icon) in listOf(-23.4 to "❄", 0.0 to "☀", 23.4 to "🌞"))

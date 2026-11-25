@@ -23,15 +23,17 @@ object ResidentNavigation {
     }
 
     fun route(plan: Plan, from: P? = null, destination: P? = null): List<P> {
-        val rooms = Rooms.detect(plan).filter { it.info?.type?.name !in setOf("YARD", "BALCONY", "GARAGE") }
-        if (rooms.isEmpty()) return emptyList()
+        val rooms = Rooms.detect(plan)
+        val indoor = rooms.filter { it.info?.type?.name !in setOf("YARD", "BALCONY", "GARAGE") }
+        if (indoor.isEmpty()) return emptyList()
         val all = rooms.flatMap { it.polygon }
         val x0 = all.minOf { it.x }; val y0 = all.minOf { it.y }
         val w = all.maxOf { it.x } - x0; val h = all.maxOf { it.y } - y0
         val grid = maxOf(250.0, w / 55.0, h / 55.0)
         val nx = ceil(w / grid).toInt().coerceAtMost(56) + 1
         val ny = ceil(h / grid).toInt().coerceAtMost(56) + 1
-        fun at(i: Int) = P(x0 + (i % nx) * grid, y0 + (i / nx) * grid)
+        val points = MutableList(nx * ny) { i -> P(x0 + (i % nx) * grid, y0 + (i / nx) * grid) }
+        fun at(i: Int) = points[i]
         val furniture = plan.items.map { Interior.corners(it) }
         val doors = Interior.openings(plan)
         val walls = plan.walls.mapNotNull { wall ->
@@ -46,14 +48,31 @@ object ResidentNavigation {
             walls.all { (wall, a, b) -> Geo.distToSegment(p, a, b) >= wall.thickness / 2.0 + 25 }
         if (from != null && destination != null && rooms.none { Geo.inside(destination, it.polygon) } &&
             canWalk(from, destination) && furniture.none { f -> (1..20).any { k -> Geo.inside(from + (destination - from) * (k / 20.0), f) } }) return listOf(from, destination)
-        val valid = BooleanArray(nx * ny) { valid(at(it)) }
-        val startRoom = rooms.maxByOrNull { room -> plan.items.count { Geo.inside(P(it.x.toDouble(), it.y.toDouble()), room.polygon) } * 10000.0 + room.area }!!
+        val gridCount = points.size
+        val valid = MutableList(gridCount) { valid(at(it)) }
+        val edges = mutableMapOf<Int, MutableSet<Int>>()
+        fun link(a: Int, b: Int) { edges.getOrPut(a) { mutableSetOf() }.add(b); edges.getOrPut(b) { mutableSetOf() }.add(a) }
+        fun clearSegment(a: P, b: P): Boolean = canWalk(a, b) && furniture.none { f -> (1..9).any { k -> Geo.inside(a + (b - a) * (k / 10.0), f) } }
+        // Add waypoints on both sides of each doorway. Grid cells alone can miss narrow or offset doors.
+        for (opening in doors.values.flatten().filter { it.opening.kind != OpeningKind.WINDOW }) {
+            val a = plan.pos(opening.wall.a) ?: continue; val b = plan.pos(opening.wall.b) ?: continue
+            val dir = (b - a).norm(); val mid = a + dir * ((opening.t0 + opening.t1) / 2.0)
+            val offset = opening.wall.thickness / 2.0 + 180.0
+            val left = mid + dir.left() * offset; val right = mid - dir.left() * offset
+            if (!valid(left) || !valid(right) || !clearSegment(left, right)) continue
+            val li = points.size; points.add(left); valid.add(true)
+            val ri = points.size; points.add(right); valid.add(true); link(li, ri)
+            for (portal in listOf(li, ri)) {
+                for (i in 0 until gridCount) if (valid[i] && (at(i) - at(portal)).len <= grid * 3 + 350 && clearSegment(at(portal), at(i))) link(portal, i)
+            }
+        }
+        val startRoom = indoor.maxByOrNull { room -> plan.items.count { Geo.inside(P(it.x.toDouble(), it.y.toDouble()), room.polygon) } * 10000.0 + room.area }!!
         val entry = doors.values.flatten().asSequence().filter { it.opening.kind != OpeningKind.WINDOW }.mapNotNull { opening ->
             val a = plan.pos(opening.wall.a) ?: return@mapNotNull null
             val b = plan.pos(opening.wall.b) ?: return@mapNotNull null
             val dir = (b - a).norm(); val mid = a + dir * ((opening.t0 + opening.t1) / 2.0)
             val left = mid + dir.left() * 700.0; val right = mid - dir.left() * 700.0
-            val leftIndoor = rooms.any { Geo.inside(left, it.polygon) }; val rightIndoor = rooms.any { Geo.inside(right, it.polygon) }
+            val leftIndoor = indoor.any { Geo.inside(left, it.polygon) }; val rightIndoor = indoor.any { Geo.inside(right, it.polygon) }
             if (leftIndoor == rightIndoor) null else if (leftIndoor) right else left
         }.mapNotNull { outside ->
             val inside = valid.indices.asSequence().filter { valid[it] && (at(it) - outside).len < 2000.0 && canWalk(outside, at(it)) &&
@@ -70,7 +89,10 @@ object ResidentNavigation {
         val start = requestedStart ?: entry?.second ?: valid.indices.filter { valid[it] && Geo.inside(at(it), startRoom.polygon) }.minByOrNull { (at(it) - startRoom.anchor).len } ?: return listOf(startRoom.anchor)
         val parents = IntArray(valid.size) { -1 }; val queue = ArrayDeque<Int>(); queue.add(start); parents[start] = start
         while (queue.isNotEmpty()) {
-            val i = queue.removeFirst(); val x = i % nx; val y = i / nx
+            val i = queue.removeFirst()
+            for (n in edges[i].orEmpty()) if (parents[n] < 0) { parents[n] = i; queue.add(n) }
+            if (i >= gridCount) continue
+            val x = i % nx; val y = i / nx
             for ((xx, yy) in (1..4).flatMap { d -> listOf(x - d to y, x + d to y, x to y - d, x to y + d) }) {
                 if (xx !in 0 until nx || yy !in 0 until ny) continue
                 val n = yy * nx + xx

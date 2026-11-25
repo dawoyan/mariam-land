@@ -99,4 +99,17 @@ class ResidentSceneTest {
         plan = PlanOps.addRect(plan, 4000, 0, 8000, 4000)
         assertTrue(ResidentNavigation.route(plan, P(3600.0, 2000.0), P(4300.0, 2000.0)).isEmpty())
     }
+
+    @Test fun doorwayWaypointsBridgeAnOffsetDoorInALargeHouse() {
+        var plan = PlanOps.addRect(Plan("large", "House"), 0, 0, 4100, 3800)
+        plan = PlanOps.addRect(plan, 4100, 0, 8500, 3800)
+        plan = PlanOps.addRect(plan, 8500, 0, 14000, 3800)
+        plan = assertNotNull(PlanOps.addOpening(plan, OpeningKind.DOOR, P(4100.0, 1730.0), 500.0))
+        plan = assertNotNull(PlanOps.addOpening(plan, OpeningKind.DOOR, P(8500.0, 2330.0), 500.0))
+        val start = P(1200.0, 2000.0); val target = P(12500.0, 2000.0)
+        val route = ResidentNavigation.route(plan, start, target)
+        assertTrue(route.isNotEmpty())
+        assertTrue((route.last() - target).len < 700)
+        assertTrue(route.zipWithNext().all { (a, b) -> Interior.canWalk(plan, a, b) })
+    }
 }

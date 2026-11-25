@@ -172,7 +172,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         restored = true
         // Restore only after construction has finished; keep saved files intact if restoration fails.
         prefs.getString("lastProject", null)?.let { id -> plans.firstOrNull { it.id == id } }?.let { project ->
-            runCatching { open(project) }.onFailure { android.util.Log.e("MariamLand", "Saved house could not be opened", it) }
+            runCatching { open(project) }.onFailure { android.util.Log.e("MariamLand", "Saved house could not be opened", it); Diagnostics.record(getApplication(), "restore_failed " + it.stackTraceToString().take(5000)) }
         }
     }
 

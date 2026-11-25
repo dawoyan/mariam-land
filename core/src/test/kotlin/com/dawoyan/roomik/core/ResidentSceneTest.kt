@@ -43,4 +43,24 @@ class ResidentSceneTest {
         assertTrue(plan.items.all { Furniture.parts(it).isNotEmpty() })
         assertTrue(Mesh.build(plan).vertexCount > 0)
     }
+
+    @Test fun exteriorDoorProducesAPathFromOutsideIntoTheHouse() {
+        var plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 5000, 4000)
+        plan = assertNotNull(PlanOps.addOpening(plan, OpeningKind.DOOR, P(2500.0, 0.0), 500.0))
+        plan = PlanOps.addItem(plan, "fridge", 3500, 2500)
+        val room = Rooms.detect(plan).single()
+        val route = ResidentNavigation.route(plan)
+        assertTrue(route.size > 1)
+        assertTrue(!Geo.inside(route.first(), room.polygon))
+        assertTrue(route.drop(1).any { Geo.inside(it, room.polygon) })
+        assertTrue(route.zipWithNext().all { (a, b) -> Interior.canWalk(plan, a, b) })
+        assertTrue(ResidentNavigation.diagnose(plan).exteriorEntry)
+    }
+
+    @Test fun missingExteriorDoorProducesAnHonestDiagnostic() {
+        val plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 4000, 3000)
+        val diagnosis = ResidentNavigation.diagnose(plan)
+        assertTrue(!diagnosis.exteriorEntry)
+        assertTrue(diagnosis.reason == "no_usable_door")
+    }
 }

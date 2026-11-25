@@ -123,7 +123,7 @@ fun View3DScreen(vm: AppViewModel) {
                 PlanRenderer(mesh, plan, root.elevation(floorNo) / 1000f, root.elevation(topShown) / 1000f).also { it.cutaway = cutaway; it.ghost = ghost; it.south = root.south }
             }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-        catch (e: Exception) { android.util.Log.e("MariamLand", "3D scene failed", e); sceneError = true }
+        catch (e: Exception) { android.util.Log.e("MariamLand", "3D scene failed", e); com.dawoyan.roomik.Diagnostics.record(context, "scene_failed " + e.stackTraceToString().take(5000)); sceneError = true }
     }
     val renderer = rendererState
     if (renderer == null) {
@@ -265,7 +265,7 @@ fun View3DScreen(vm: AppViewModel) {
             if (root.floors.isNotEmpty() || root.basements.isNotEmpty())
                 Row(Modifier.align(Alignment.TopStart).padding(8.dp).hScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FloorChip(stringResource(R.string.whole_house), shown == null, null) { shown = null }
-                    for (i in root.floorRange.reversed()) FloorChip(floorName(i, root), shown == i, null) { shown = i }
+                    for (i in root.floorRange.reversed()) FloorChip(floorName(i, root), shown == i, null) { vm.selectFloor(i); shown = i }
                 }
             Surface(Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {

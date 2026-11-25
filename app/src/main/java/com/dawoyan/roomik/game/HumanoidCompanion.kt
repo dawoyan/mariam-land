@@ -54,6 +54,11 @@ import com.dawoyan.roomik.R
 import com.dawoyan.roomik.core.PointKind
 import com.dawoyan.roomik.core.allFloors
 import com.dawoyan.roomik.core.YardKind
+import com.dawoyan.roomik.core.ResidentNavigation
+import com.dawoyan.roomik.core.floor
+import com.dawoyan.roomik.core.groundFloor
+import com.dawoyan.roomik.core.SITE
+import com.dawoyan.roomik.Diagnostics
 import java.util.Locale
 
 private data class HomeProgress(val bedrooms: Int, val bed: Boolean, val toilet: Boolean, val kitchen: Boolean, val lights: Int, val yard: Boolean) {
@@ -85,6 +90,15 @@ fun HumanoidCompanion(vm: AppViewModel) {
     var careOpen by remember { mutableStateOf(false) }
     var shopOpen by remember { mutableStateOf(false) }
     val progress = remember(vm.root) { homeProgress(vm) }
+    var navigation by remember(vm.root, vm.floor) { mutableStateOf<ResidentNavigation.Diagnosis?>(null) }
+    androidx.compose.runtime.LaunchedEffect(vm.root, vm.floor) {
+        val root = vm.root ?: return@LaunchedEffect
+        val floorNumber = if (vm.floor == SITE) root.groundFloor else vm.floor
+        val plan = root.floor(floorNumber)
+        val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { ResidentNavigation.diagnose(plan) }
+        navigation = result
+        Diagnostics.record(context, "navigation floor=$floorNumber rooms=${result.rooms} doors=${result.doors} exteriorEntry=${result.exteriorEntry} points=${result.points} lengthMm=${result.lengthMm} reason=${result.reason} walls=${plan.walls.size} openings=${plan.openings.size} furniture=${plan.items.size}")
+    }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60000); now = System.currentTimeMillis() } }
     val dryTree = vm.root?.allFloors.orEmpty().flatMap { it.models }.firstOrNull { tree ->
@@ -92,6 +106,9 @@ fun HumanoidCompanion(vm: AppViewModel) {
         tree.yard?.kind in setOf(YardKind.TREE, YardKind.POPLAR, YardKind.CYPRESS) && prefs.contains(key) && now - prefs.getLong(key, now) >= 14 * 3600000L
     }
     val concern = when {
+        navigation?.reason == "no_detected_indoor_room" -> "Я не вижу закрытой комнаты. Проверьте, соединены ли стены. / Ես փակ սենյակ չեմ տեսնում։"
+        navigation?.reason == "no_usable_door" -> "Я не вижу подходящей двери. Добавьте дверь в стену дома. / Տան պատի մեջ դուռ է պետք։"
+        navigation?.reason == "no_safe_exterior_entry_found" -> "Я не могу найти путь с улицы в дом. Проверьте наружную дверь и свободное место рядом. / Չեմ գտնում մուտքը դեպի տուն։"
         !progress.complete -> progress.next()
         prefs.getBoolean("dog", false) && now - prefs.getLong("dog_fed", now) > 12 * 3600000L -> "Собака голодна, давай её покормим. / Շունը սոված է, կերակրենք նրան։"
         dryTree != null -> "Дерево ${dryTree.name} засыхает, ему нужна вода. / Ծառը ջրի կարիք ունի։"

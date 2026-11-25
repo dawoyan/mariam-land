@@ -11,7 +11,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +28,7 @@ import com.dawoyan.roomik.ui.EditorScreen
 import com.dawoyan.roomik.ui.MaterialsScreen
 import com.dawoyan.roomik.ui.ProjectsScreen
 import com.dawoyan.roomik.ui.View3DScreen
+import com.dawoyan.roomik.ui.DiagnosticsButton
 
 /** Mariam Land combines Roomik's complete house planner with a resident to build for. */
 class MainActivity : ComponentActivity() {
@@ -52,6 +57,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Diagnostics.install(this)
         enableEdgeToEdge()
         vm.restoreLastProject()
         if (savedInstanceState == null) take(intent)
@@ -60,7 +66,8 @@ class MainActivity : ComponentActivity() {
             else lightColorScheme(primary = Color(0xFF2F6B8A), secondary = Color(0xFFFFC857))
             MaterialTheme(colorScheme = scheme) {
                 BackHandler(vm.screen != Screen.PROJECTS) { vm.back() }
-                Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { DiagnosticsButton() }
                     if (vm.screen == Screen.EDITOR || vm.screen == Screen.VIEW3D) HumanoidCompanion(vm)
                     Box(Modifier.weight(1f)) {
                         when (vm.screen) {

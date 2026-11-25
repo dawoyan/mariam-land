@@ -18,6 +18,13 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SavedHouseStartupTest {
+    @Test fun diagnosticsAreAvailableAfterRecording() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val marker = "navigation_test_${UUID.randomUUID()}"
+        Diagnostics.record(app, marker)
+        assertTrue(Diagnostics.report(app).contains(marker))
+    }
+
     @Test fun savedHouseCanBeRestoredAfterConstructionWithoutDeletingGrass() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val prefs = app.getSharedPreferences("roomik", 0)

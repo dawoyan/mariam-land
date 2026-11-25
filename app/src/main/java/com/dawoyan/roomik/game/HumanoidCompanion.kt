@@ -9,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,7 @@ import com.dawoyan.roomik.AppViewModel
 import com.dawoyan.roomik.R
 import com.dawoyan.roomik.core.PointKind
 import com.dawoyan.roomik.core.allFloors
+import com.dawoyan.roomik.core.YardKind
 import java.util.Locale
 
 private data class HomeProgress(val bedrooms: Int, val toilet: Boolean, val kitchen: Boolean, val lights: Int, val yard: Boolean) {
@@ -74,6 +76,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
     var place by remember { mutableStateOf(prefs.getString("place", "Дома") ?: "Дома") }
     var happiness by remember { mutableStateOf(prefs.getInt("happiness", 50)) }
     var dialog by remember { mutableStateOf(selected.isEmpty()) }
+    var careOpen by remember { mutableStateOf(false) }
     val progress = remember(vm.root) { homeProgress(vm) }
     val speak = rememberRussianSpeech(context)
     val pulse by rememberInfiniteTransition(label = "resident")
@@ -95,6 +98,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
                     Text("$face $name · $happiness%")
                     Text("📍 $place", style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
                     LinearProgressIndicator(progress = { progress.score / 100f }, modifier = Modifier.size(width = 74.dp, height = 5.dp))
+                    TextButton(onClick = { careOpen = true }) { Text("🌱 🐕 Уход") }
                 }
             }
         }
@@ -112,6 +116,32 @@ fun HumanoidCompanion(vm: AppViewModel) {
         }
     )
     if (dialog && selected.isNotEmpty()) ResidentDialog(name, residentAge, portrait, face, progress, pulse, place, speak, ::go) { dialog = false }
+    if (careOpen) {
+        val root = vm.root
+        val trees = root?.let { it.allFloors.flatMap { floor -> floor.models } + it.site?.models.orEmpty() }.orEmpty()
+            .filter { it.yard?.kind in setOf(YardKind.TREE, YardKind.POPLAR, YardKind.CYPRESS) }
+        var tick by remember { mutableStateOf(System.currentTimeMillis()) }
+        var dog by remember { mutableStateOf(prefs.getBoolean("dog", false)) }
+        var fed by remember { mutableStateOf(prefs.getLong("dog_fed", 0L)) }
+        androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); tick = System.currentTimeMillis() } }
+        AlertDialog(onDismissRequest = { careOpen = false }, title = { Text("Уход за домом") }, text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                if (trees.isEmpty()) Text("Посадите дерево во дворе: 🌿 → 🌱 Посадить дерево → нажмите на землю.")
+                trees.forEach { tree ->
+                    val key = "tree_${root?.id}_${tree.id}"
+                    val last = prefs.getLong(key, tick).also { if (!prefs.contains(key)) prefs.edit().putLong(key, it).apply() }
+                    val dryness = (((tick - last).coerceAtLeast(0L) / 3600000L) * 5).coerceIn(0, 100).toInt()
+                    Text("${tree.name}: сухость $dryness% ${if (dryness >= 70 && (tick / 500) % 2L == 0L) "🔴" else "🌱"}", color = if (dryness >= 70) Color.Red else Color.Unspecified)
+                    TextButton(onClick = { prefs.edit().putLong(key, System.currentTimeMillis()).apply(); tick = System.currentTimeMillis() }) { Text("💧 Полить") }
+                }
+                if (!dog) TextButton(onClick = { dog = true; fed = tick; prefs.edit().putBoolean("dog", true).putLong("dog_fed", tick).apply() }) { Text("🐕 Приютить собаку") }
+                else {
+                    Text(if (tick - fed > 12 * 3600000L) "🐕 Собака голодна" else "🐕 Собака сыта")
+                    TextButton(onClick = { fed = tick; prefs.edit().putLong("dog_fed", tick).apply() }) { Text("🍖 Покормить собаку") }
+                }
+            }
+        }, confirmButton = { TextButton(onClick = { careOpen = false }) { Text("Готово") } })
+    }
 }
 
 private fun homeProgress(vm: AppViewModel): HomeProgress {

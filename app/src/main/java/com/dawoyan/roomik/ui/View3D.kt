@@ -247,9 +247,7 @@ fun View3DScreen(vm: AppViewModel) {
                             FilterChip(season == d, { season = d; renderer.declination = d; view.requestRender() }, label = { Text(icon) })
                         if (!inside) AssistChip(onClick = { photosOpen = true }, label = { Text("📷 " + stringResource(R.string.side_photos)) })
                         if (!inside) FilterChip(ghost, { ghost = !ghost; renderer.ghost = ghost; view.requestRender() }, label = { Text(stringResource(R.string.outer_walls) + " 10%") })
-                        for ((l, name) in listOf(com.dawoyan.roomik.core.Layer.ELECTRIC to R.string.layer_cables, com.dawoyan.roomik.core.Layer.FURNITURE to R.string.tool_interior,
-                            com.dawoyan.roomik.core.Layer.WATER to R.string.layer_water, com.dawoyan.roomik.core.Layer.HEATING to R.string.sys_heating,
-                            com.dawoyan.roomik.core.Layer.SEWER to R.string.sys_sewer, com.dawoyan.roomik.core.Layer.NETWORK to R.string.sys_network)) {
+                        for ((l, name) in listOf(com.dawoyan.roomik.core.Layer.FURNITURE to R.string.tool_interior)) {
                             val on = l !in vm.hidden
                             FilterChip(on, { vm.hidden = if (on) vm.hidden + l else vm.hidden - l }, label = { Text(stringResource(name)) })
                         }

@@ -1387,7 +1387,7 @@ private fun PlanCanvas(vm: AppViewModel, ed: EditorState, plan: Plan, rooms: Lis
                             val i = r.points.indices.minBy { (P(r.points[it].x.toDouble(), r.points[it].y.toDouble()) - w).len }
                             ed.yardPointIds = if (i in ed.yardPointIds) ed.yardPointIds - i else ed.yardPointIds + i
                         }
-                        ed.tool in setOf(Tool.ROAD, Tool.YARD) && (h !is Sel.RoadSel || ed.pipePts.isNotEmpty()) -> {
+                        ed.tool in setOf(Tool.ROAD, Tool.YARD) && ed.yardKind == null && ed.itemKind == null && vm.assetToPlace == null && (h !is Sel.RoadSel || ed.pipePts.isNotEmpty()) -> {
                             var q = snap(before, w).first
                             ed.pipePts.lastOrNull()?.let { q = align(q, listOf(it)) }
                             ed.pipePts = ed.pipePts + q
@@ -3127,6 +3127,10 @@ private fun SelectionPanel(vm: AppViewModel, ed: EditorState, plan: Plan, rooms:
                             label = { Text(if (placing != null) "✓ " + placing.name else "📦 " + stringResource(R.string.assets_3d) + " ▾", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             modifier = Modifier.widthIn(max = 200.dp))
                         if (outside) {
+                            FilterChip(ed.yardKind == YardKind.TREE, onClick = {
+                                finishDrawing(vm, ed); ed.tool = Tool.YARD; ed.yardKind = YardKind.TREE
+                                ed.yardSpec = Yard.default(YardKind.TREE); ed.itemKind = null; ed.roadArea = false
+                            }, label = { Text("🌱 Посадить дерево") })
                             // Exterior objects are deliberately grouped: greenery first, then built yard pieces.
                             val green = listOf(YardKind.TREE, YardKind.POPLAR, YardKind.CYPRESS, YardKind.ROCK)
                             // GREEN_AREA is kept only to open older saved plans; new lawns are drawn as closed shapes.

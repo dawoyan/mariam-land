@@ -381,7 +381,7 @@ object Yard {
     }
 
     private fun tree(s: YardSpec, ru: Boolean): List<Part> {
-        val h = s.h.coerceIn(1500, 20000).toDouble(); val r = (s.w.coerceAtLeast(800) / 2).toDouble()
+        val h = s.h.coerceIn(500, 20000).toDouble(); val r = (s.w.coerceAtLeast(300) / 2).toDouble()
         val trunk = Part(t(ru, "Trunk", "Ствол"), 0x6B4A2E)
         val crown = Part(t(ru, "Crown", "Крона"), 0x4F7A3A)
         trunk.bar(V(0.0, 0.0, 0.0), V(0.0, 0.0, h * 0.55), h * 0.04 + 80, h * 0.04 + 80)
@@ -412,7 +412,7 @@ object Yard {
         YardKind.SWING -> YardSpec(kind, 2000, 1500, 2200)
         YardKind.BBQ -> YardSpec(kind, 1500, 700, 2200)
         YardKind.GREEN_AREA -> YardSpec(kind, 4000, 3000, 300)
-        YardKind.TREE -> YardSpec(kind, 3000, 3000, 5000)
+        YardKind.TREE -> YardSpec(kind, 600, 600, 1000)
         YardKind.POPLAR -> YardSpec(kind, 1600, 1600, 14000)
         YardKind.CYPRESS -> YardSpec(kind, 900, 900, 2500)
         YardKind.POLE -> YardSpec(kind, 1500, 300, 9000, post = 250)

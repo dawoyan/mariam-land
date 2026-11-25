@@ -86,6 +86,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dawoyan.roomik.AppViewModel
 import com.dawoyan.roomik.R
 import com.dawoyan.roomik.core.Mesh
+import com.dawoyan.roomik.core.ResidentNavigation
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -360,8 +361,7 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
     @Volatile var weatherNight = false
     @Volatile var weatherCloudy = false
     @Volatile var followResident = true
-    private val residentStart = Mesh.residentPosition(plan, 0)
-    private val residentEnd = Mesh.residentPosition(plan, 40)
+    private val residentRoute = ResidentNavigation.route(plan)
     private val animationStart = android.os.SystemClock.elapsedRealtime()
     private val span = max(mesh.maxX - mesh.minX, mesh.maxZ - mesh.minZ)
     @Volatile private var yaw = 25f
@@ -733,10 +733,11 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
             mesh = m
             buffer = ByteBuffer.allocateDirect(m.data.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(m.data); position(0) }
         }
-        val a = residentStart; val b = residentEnd
-        if (a != null && b != null && mesh.residentParts.isNotEmpty()) {
+        val a = residentRoute.firstOrNull()
+        if (a != null && mesh.residentParts.isNotEmpty()) {
             val seconds = (android.os.SystemClock.elapsedRealtime() - animationStart) / 1000.0
-            val distance = kotlin.math.hypot(b.x - a.x, b.y - a.y) / 1000.0
+            val lengths = residentRoute.zipWithNext { u, v -> (v - u).len / 1000.0 }
+            val distance = lengths.sum()
             val duration = (distance / .35).coerceAtLeast(3.0)
             val period = 2 * duration + 8.0
             val cycle = seconds % period
@@ -747,8 +748,15 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
                 cycle < 2 * duration + 4.0 -> 1.0 - (cycle - duration - 4.0) / duration
                 else -> 0.0
             }
-            val dx = ((b.x - a.x) * t / 1000).toFloat()
-            val dz = ((b.y - a.y) * t / 1000).toFloat()
+            var remaining = distance * t
+            var current = a
+            for (i in lengths.indices) {
+                val length = lengths[i]
+                if (remaining <= length && length > 0) { current = residentRoute[i] + (residentRoute[i + 1] - residentRoute[i]) * (remaining / length); break }
+                remaining -= length; current = residentRoute[i + 1]
+            }
+            val dx = ((current.x - a.x) / 1000).toFloat()
+            val dz = ((current.y - a.y) / 1000).toFloat()
             val walk = if (moving) sin(seconds * 4.0).toFloat() else 0f
             val bob = if (moving) kotlin.math.abs(walk) * .012f else (sin(seconds * 1.5) * .004).toFloat()
             mesh.residentParts.forEachIndexed { index, range ->

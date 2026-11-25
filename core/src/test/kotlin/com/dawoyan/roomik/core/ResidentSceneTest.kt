@@ -22,4 +22,16 @@ class ResidentSceneTest {
         plan = assertNotNull(PlanOps.addPoint(plan, PointKind.LAMP, P(2000.0, 1500.0), 1000.0))
         assertTrue(Mesh.build(plan, hidden = setOf(Layer.ELECTRIC)).lights.isNotEmpty())
     }
+
+    @Test fun residentCanReachFurnitureThroughAnInteriorDoor() {
+        var plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 4000, 4000)
+        plan = PlanOps.addRect(plan, 4000, 0, 8000, 4000)
+        plan = assertNotNull(PlanOps.addOpening(plan, OpeningKind.DOOR, P(4000.0, 2000.0), 500.0))
+        plan = PlanOps.addItem(plan, "fridge", 6800, 1800)
+        plan = PlanOps.addItem(plan, "bed", 1200, 1800)
+        val route = ResidentNavigation.route(plan)
+        assertTrue(route.size > 1)
+        assertTrue(route.zipWithNext().all { (a, b) -> Interior.canWalk(plan, a, b) })
+        assertTrue(route.any { it.x < 4000 } && route.any { it.x > 4000 })
+    }
 }

@@ -115,6 +115,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
                 Image(painterResource(portrait), contentDescription = name, modifier = Modifier.height(64.dp).clickable { dialog = true })
                 Text("$face $name · $happiness%", modifier = Modifier.weight(1f).clickable { dialog = true }, style = MaterialTheme.typography.labelLarge)
                 TextButton(onClick = { careOpen = true }) { Text("🌱 🐕") }
+                TextButton(onClick = { speak(concern.substringBefore(" / ")) }) { Text("🔊") }
                 TextButton(onClick = { dialog = true }) { Text("💬") }
             }
             Text("💬 $concern", modifier = Modifier.clickable { dialog = true }, style = MaterialTheme.typography.labelSmall, maxLines = 2)

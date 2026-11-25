@@ -243,7 +243,7 @@ class Mesh(
 
             // A simple in-scene resident, on the selected floor rather than in the saved house model.
             if (fi == residentFloor && rooms.isNotEmpty()) {
-                val p = residentPosition(plan, residentStep) ?: rooms.first().anchor
+                val p = ResidentNavigation.route(plan).firstOrNull() ?: rooms.first().anchor
                 val stride = kotlin.math.sin(residentStep * Math.PI / 4) * 105.0
                 val bob = (kotlin.math.abs(kotlin.math.sin(residentStep * Math.PI / 4)) * 0.025).toFloat()
                 kind = KIND_PLAIN; room = -1

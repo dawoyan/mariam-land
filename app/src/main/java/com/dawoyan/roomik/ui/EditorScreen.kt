@@ -781,6 +781,7 @@ private fun PlanCanvas(vm: AppViewModel, ed: EditorState, plan: Plan, rooms: Lis
     val placeWord = stringResource(R.string.place)
     val yardNames = YardKind.entries.associateWith { yardName(it) }
     val itemNames = Catalog.all.associate { it.id to itemName(it.id) }
+    val roomAreaUnit = stringResource(R.string.m2)
     val tm = rememberTextMeasurer()
     val lang = language()
     val accent = MaterialTheme.colorScheme.primary
@@ -1941,10 +1942,12 @@ private fun PlanCanvas(vm: AppViewModel, ed: EditorState, plan: Plan, rooms: Lis
             val t = pl.name.ifBlank { pl.type?.label(lang) ?: placeWord }
             label(tm, t, Offset(o.x, o.y + r + 10.dp.toPx()), TextStyle(fontSize = 12.sp, color = Color(0xFF3B2A78), fontWeight = FontWeight.Medium), Color(0xCCF7F7F3))
         }
-        // Room names only; measurements stay out of the 2D living view.
+        // Measurements are visible only while selecting in the drawing tools.
         for (r in rooms) {
             val title = r.info?.name?.takeIf { it.isNotEmpty() } ?: r.info?.type?.label(lang)
-            if (title != null) label(tm, title, ed.toScreen(r.anchor), TextStyle(fontSize = 12.sp, color = Color(0xFF20242C), fontWeight = FontWeight.Medium, textAlign = TextAlign.Center), null)
+            val showSize = ed.category == Tool.WALL && ed.tool == Tool.SELECT && ed.moveMode
+            val text = listOfNotNull(title, if (showSize) "${num(r.area)} $roomAreaUnit" else null).joinToString("\n")
+            if (text.isNotEmpty()) label(tm, text, ed.toScreen(r.anchor), TextStyle(fontSize = 12.sp, color = Color(0xFF20242C), fontWeight = FontWeight.Medium, textAlign = TextAlign.Center), null)
         }
 
         // Warm floor: wavy lines over the room.
@@ -3460,6 +3463,11 @@ private fun SelectionPanel(vm: AppViewModel, ed: EditorState, plan: Plan, rooms:
                     Column(Modifier.weight(1f)) {
                         Text(room.info?.name?.takeIf { it.isNotEmpty() } ?: room.info?.type?.label(lang) ?: stringResource(R.string.room),
                             style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (ed.category == Tool.WALL && ed.tool == Tool.SELECT && ed.moveMode) {
+                            Text(stringResource(R.string.area) + " " + num(room.area) + " " + stringResource(R.string.m2) + " · " +
+                                stringResource(R.string.perimeter) + " " + num(room.perimeter) + " " + stringResource(R.string.m),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     IconButton(onClick = { vm.insideAt = room.anchor; vm.screen = Screen.VIEW3D }) { Icon(Icons.Default.ViewInAr, stringResource(R.string.view_inside)) }
                     IconButton(onClick = { editRoom = true }) { Icon(Icons.Default.Edit, stringResource(R.string.edit)) }

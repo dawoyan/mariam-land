@@ -47,6 +47,7 @@ class Mesh(
             val poly = room.polygon
             val xs = poly.map { it.x }; val ys = poly.map { it.y }
             val candidates = mutableListOf<P>()
+            val spacing = maxOf(400.0, (xs.max() - xs.min()) / 40.0, (ys.max() - ys.min()) / 40.0)
             var x = xs.min() + 300.0
             while (x < xs.max() - 300.0) {
                 var y = ys.min() + 300.0
@@ -56,9 +57,9 @@ class Mesh(
                         val a = plan.pos(w.a); val b = plan.pos(w.b)
                         a == null || b == null || Geo.distToSegment(p, a, b) > 300.0
                     }) candidates += p
-                    y += 400.0
+                    y += spacing
                 }
-                x += 400.0
+                x += spacing
             }
             val start = candidates.minByOrNull { (it - room.anchor).len } ?: room.anchor
             val end = candidates.filter { Interior.canWalk(plan, start, it) }.maxByOrNull { (it - start).len } ?: start
@@ -597,7 +598,6 @@ class Mesh(
             }
 
             // Electrical points: plates on the wall at their height (they go down with a lowered wall), lamps hanging.
-            val lights = ArrayList<Light>()
             for (p in Interior.place(plan).filter { Layer.ELECTRIC !in hidden || it.point.kind == PointKind.LAMP }) {
                 if (p.point.kind == PointKind.LAMP) {
                     kind = KIND_PLAIN

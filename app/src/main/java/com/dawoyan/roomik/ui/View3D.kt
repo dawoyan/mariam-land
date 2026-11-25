@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.produceState
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -111,11 +112,27 @@ fun View3DScreen(vm: AppViewModel) {
     val hidden = vm.hidden + setOf(com.dawoyan.roomik.core.Layer.ELECTRIC, com.dawoyan.roomik.core.Layer.WATER, com.dawoyan.roomik.core.Layer.HEATING, com.dawoyan.roomik.core.Layer.SEWER, com.dawoyan.roomik.core.Layer.NETWORK) + if (cutaway) setOf(com.dawoyan.roomik.core.Layer.ROOF) else emptySet()
     var ghost by remember { mutableStateOf(false) }
     fun meshFor(h: Set<com.dawoyan.roomik.core.Layer>, step: Int = 0) = shown?.let { Mesh.build(root, it, it, hidden = h, residentFloor = floorNo, residentStep = step) } ?: Mesh.build(root, root.floors.size, hidden = h, residentFloor = floorNo, residentStep = step)
-    val renderer = remember(root, shown) {
-        val mesh = meshFor(hidden)
-        // "Low walls" cuts the top storey shown, not the one being edited
-        val topShown = shown ?: root.floors.size
-        PlanRenderer(mesh, plan, root.elevation(floorNo) / 1000f, root.elevation(topShown) / 1000f).also { it.cutaway = cutaway; it.ghost = ghost; it.south = root.south }
+    var sceneError by remember(root, shown) { mutableStateOf(false) }
+    val rendererState by produceState<PlanRenderer?>(null, root, shown) {
+        value = null
+        try {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val mesh = meshFor(hidden)
+                val topShown = shown ?: root.floors.size
+                PlanRenderer(mesh, plan, root.elevation(floorNo) / 1000f, root.elevation(topShown) / 1000f).also { it.cutaway = cutaway; it.ghost = ghost; it.south = root.south }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { android.util.Log.e("MariamLand", "3D scene failed", e); sceneError = true }
+    }
+    val renderer = rendererState
+    if (renderer == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(if (sceneError) "Не удалось открыть 3D. Дом сохранён." else "Загружаем дом…")
+                TextButton(onClick = { vm.back() }) { Text("Открыть 2D") }
+            }
+        }
+        return
     }
     var xray by remember { mutableStateOf(false) }
     var lensAt by remember { mutableStateOf<Offset?>(null) }

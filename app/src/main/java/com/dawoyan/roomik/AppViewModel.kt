@@ -189,15 +189,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun open(p: Plan) {
         undo.clear(); redo.clear(); history()
-        // Grass made before Backyard became a site-only tool could be attached to a storey and appear below it.
-        // Remove that one-time bad format; all new Backyard platforms live in the site's plan.
-        fun clearLegacyGrass(q: Plan): Plan = q.copy(
-            roads = q.roads.filterNot { it.surface == com.dawoyan.roomik.core.Surface.GRASS },
-            floors = q.floors.map(::clearLegacyGrass), basements = q.basements.map(::clearLegacyGrass),
-            site = q.site?.let(::clearLegacyGrass), schemaVersion = 3,
-        )
-        // Version 3 repeats the cleanup for plans already opened by the transitional Backyard builds.
-        val source = if (p.schemaVersion < 3) clearLegacyGrass(p) else p
+        // Preserve older landscape data: opening a house must never delete its grass.
+        val source = p
         // Plans from older versions get lasting room ids here, which elektronik knows the rooms by.
         fun fix(f0: Plan): Plan {
             val f = com.dawoyan.roomik.core.Stairs.migrate(f0)

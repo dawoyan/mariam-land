@@ -16,6 +16,7 @@ import com.dawoyan.roomik.core.PlanOps
 import com.dawoyan.roomik.core.floor
 import com.dawoyan.roomik.core.withFloor
 import com.dawoyan.roomik.core.floorRange
+import com.dawoyan.roomik.core.groundFloor
 import java.io.File
 import java.util.UUID
 
@@ -36,6 +37,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The floor being edited; everything the editor changes goes here. */
     val plan: Plan? get() = root?.floor(floor)
     var screen by mutableStateOf(Screen.PROJECTS)
+    var itemToPlace by mutableStateOf<String?>(null)
+    fun placeShopItem(kind: String) {
+        if (floor == com.dawoyan.roomik.core.SITE) root?.let { selectFloor(it.groundFloor) }
+        itemToPlace = kind
+        screen = Screen.EDITOR
+    }
     var canUndo by mutableStateOf(false); private set
     var canRedo by mutableStateOf(false); private set
     /** Layers hidden on the plan and in 3D. */

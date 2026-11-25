@@ -20,6 +20,7 @@ object Catalog {
         CatalogItem("fridge", 600, 650, 1850, 0xDfE4E8), CatalogItem("stove", 600, 600, 850, 0x8A8F98),
         CatalogItem("sink", 600, 500, 850, 0xBFD8E6), CatalogItem("washer", 600, 550, 850, 0xE8ECEF),
         CatalogItem("bath", 1700, 750, 600, 0xCFE6F2), CatalogItem("toilet", 400, 650, 400, 0xEEF2F4),
+        CatalogItem("vacuum", 350, 400, 1000, 0xA9494D), CatalogItem("robot_vacuum", 350, 350, 100, 0x555C67),
         CatalogItem("car", 1800, 4500, 1450, 0x3B6EA5),
         CatalogItem("fireplace", 1300, 550, 1100, 0xA0523D),
         CatalogItem("radiator", 800, 100, 600, 0xECEFF1),
@@ -37,7 +38,7 @@ object Catalog {
 
     /** Groups the catalogue is shown in: furniture, kitchen, bathroom, heating (indoors); the car goes with the yard. */
     enum class Group(val ids: List<String>) {
-        FURNITURE(listOf("sofa", "armchair", "bed", "bed1", "table", "chair", "desk", "wardrobe", "tv", "cabinet")),
+        FURNITURE(listOf("sofa", "armchair", "bed", "bed1", "table", "chair", "desk", "wardrobe", "tv", "cabinet", "vacuum", "robot_vacuum")),
         KITCHEN(listOf("cabinet", "sink", "stove", "fridge", "washer", "table", "chair")),
         BATHROOM(listOf("bath", "toilet", "sink", "washer", "cabinet")),
         HEATING(listOf("radiator", "fireplace", "chimney", "ac_in", "ac_out")),

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="f_vacuum">Փոշեկուլ</string>
+    <string name="f_robot_vacuum">Ռոբոտ փոշեկուլ</string>
     <string name="app_name">Մարիամի աշխարհ</string>
     <string name="plans">Հատակագծեր</string>
     <string name="new_plan">Նոր հատակագիծ</string>

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="f_vacuum">Vacuum cleaner</string>
+    <string name="f_robot_vacuum">Robot vacuum</string>
     <string name="app_name">Дом Марьям</string>
     <string name="plans">Plans</string>
     <string name="new_plan">New plan</string>

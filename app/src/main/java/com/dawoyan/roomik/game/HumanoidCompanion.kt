@@ -83,6 +83,7 @@ fun HumanoidCompanion(vm: AppViewModel) {
     var happiness by remember { mutableStateOf(prefs.getInt("happiness", 50)) }
     var dialog by remember { mutableStateOf(selected.isEmpty()) }
     var careOpen by remember { mutableStateOf(false) }
+    var shopOpen by remember { mutableStateOf(false) }
     val progress = remember(vm.root) { homeProgress(vm) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60000); now = System.currentTimeMillis() } }
@@ -131,7 +132,17 @@ fun HumanoidCompanion(vm: AppViewModel) {
             speak("Привет! Я $chosenName, мне $age. Я хочу уютный дом.")
         }
     )
-    if (dialog && selected.isNotEmpty()) ResidentDialog(name, residentAge, portrait, face, progress, concern, pulse, place, speak, ::go) { dialog = false }
+    if (dialog && selected.isNotEmpty()) ResidentDialog(name, residentAge, portrait, face, progress, concern, pulse, place, speak, { destination ->
+        go(destination)
+        if (destination == "Магазин") { dialog = false; shopOpen = true }
+    }) { dialog = false }
+    if (shopOpen) AlertDialog(onDismissRequest = { shopOpen = false }, title = { Text("🛍️ Магазин") }, text = {
+        Column {
+            Text("Выберите предмет, затем нажмите на пол дома в 2D, чтобы поставить его. Сейчас предметы бесплатны.")
+            TextButton(onClick = { shopOpen = false; go("Дома"); vm.placeShopItem("vacuum") }) { Text("🧹 Пылесос") }
+            TextButton(onClick = { shopOpen = false; go("Дома"); vm.placeShopItem("robot_vacuum") }) { Text("🤖 Робот-пылесос") }
+        }
+    }, confirmButton = { TextButton(onClick = { shopOpen = false; go("Дома") }) { Text("Домой") } })
     if (careOpen) {
         val root = vm.root
         val trees = root?.allFloors.orEmpty().flatMap { it.models }
@@ -139,15 +150,17 @@ fun HumanoidCompanion(vm: AppViewModel) {
         var tick by remember { mutableStateOf(System.currentTimeMillis()) }
         var dog by remember { mutableStateOf(prefs.getBoolean("dog", false)) }
         var fed by remember { mutableStateOf(prefs.getLong("dog_fed", 0L)) }
-        var robot by remember { mutableStateOf(prefs.getBoolean("robot_vacuum", false)) }
+        val homeItems = root?.allFloors.orEmpty().flatMap { it.items }
+        val hasVacuum = homeItems.any { it.kind == "vacuum" }
+        val hasRobot = homeItems.any { it.kind == "robot_vacuum" }
         var cleaned by remember { mutableStateOf(prefs.getLong("cleaned", 0L)) }
         androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); tick = System.currentTimeMillis() } }
         AlertDialog(onDismissRequest = { careOpen = false; now = System.currentTimeMillis() }, title = { Text("Уход за домом") }, text = {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 Text(if (cleaned == 0L || tick - cleaned > 24 * 3600000L) "🏠 Пора пропылесосить" else "✨ Пол чистый")
-                TextButton(onClick = { cleaned = tick; prefs.edit().putLong("cleaned", tick).apply(); speak("Я пропылесосила дом.") }) { Text("🧹 Попросить пропылесосить") }
-                if (!robot) TextButton(onClick = { robot = true; prefs.edit().putBoolean("robot_vacuum", true).apply() }) { Text("🤖 Получить робот-пылесос (бесплатно)") }
-                else TextButton(onClick = { cleaned = tick; prefs.edit().putLong("cleaned", tick).apply() }) { Text("🤖 Включить робот-пылесос") }
+                if (hasVacuum) TextButton(onClick = { cleaned = tick; prefs.edit().putLong("cleaned", tick).apply(); speak("Я пропылесосила дом.") }) { Text("🧹 Попросить пропылесосить") }
+                if (hasRobot) TextButton(onClick = { cleaned = tick; prefs.edit().putLong("cleaned", tick).apply() }) { Text("🤖 Включить робот-пылесос") }
+                if (!hasVacuum || !hasRobot) TextButton(onClick = { careOpen = false; shopOpen = true }) { Text("🛍️ Выбрать пылесос в магазине") }
                 if (trees.isEmpty()) Text("Посадите дерево во дворе: 🌿 → 🌱 Посадить дерево → нажмите на землю.")
                 trees.forEach { tree ->
                     val key = "tree_${root?.id}_${tree.id}"

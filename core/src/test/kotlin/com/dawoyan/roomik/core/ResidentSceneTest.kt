@@ -34,4 +34,13 @@ class ResidentSceneTest {
         assertTrue(route.zipWithNext().all { (a, b) -> Interior.canWalk(plan, a, b) })
         assertTrue(route.any { it.x < 4000 } && route.any { it.x > 4000 })
     }
+
+    @Test fun bothVacuumsCanBePlacedAndRendered() {
+        var plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 4000, 3000)
+        plan = PlanOps.addItem(plan, "vacuum", 1000, 1000)
+        plan = PlanOps.addItem(plan, "robot_vacuum", 2000, 1000)
+        assertTrue(plan.items.map { it.kind }.containsAll(listOf("vacuum", "robot_vacuum")))
+        assertTrue(plan.items.all { Furniture.parts(it).isNotEmpty() })
+        assertTrue(Mesh.build(plan).vertexCount > 0)
+    }
 }

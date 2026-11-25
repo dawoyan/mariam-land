@@ -28,6 +28,7 @@ class Mesh(
     /** Height of the ground, metres. */
     val groundY: Float = 0f,
     val residentParts: List<IntRange> = emptyList(),
+    val residentRoute: List<P> = emptyList(),
 ) {
     val vertexCount: Int get() = data.size / STRIDE
 
@@ -84,6 +85,7 @@ class Mesh(
             val shown = low..top
             val lights = ArrayList<Light>()
             val residentParts = ArrayList<IntRange>()
+            var residentRoute = emptyList<P>()
             var midX = 0f; var midZ = 0f; var kind = KIND_PLAIN; var room = -1; var base = 0f; var baseDm = 0
             fun v(p: P, y: Float, nx: Float, ny: Float, nz: Float, c: Int) {
                 target += (p.x / 1000).toFloat(); target += y + base; target += (p.y / 1000).toFloat()
@@ -243,7 +245,8 @@ class Mesh(
 
             // A simple in-scene resident, on the selected floor rather than in the saved house model.
             if (fi == residentFloor && rooms.isNotEmpty()) {
-                val p = ResidentNavigation.route(plan).firstOrNull() ?: rooms.first().anchor
+                residentRoute = ResidentNavigation.route(plan)
+                val p = residentRoute.firstOrNull() ?: rooms.first().anchor
                 val stride = kotlin.math.sin(residentStep * Math.PI / 4) * 105.0
                 val bob = (kotlin.math.abs(kotlin.math.sin(residentStep * Math.PI / 4)) * 0.025).toFloat()
                 kind = KIND_PLAIN; room = -1
@@ -665,7 +668,7 @@ class Mesh(
             }
             val open = out.size / STRIDE
             out.addAll(ceilings)
-            return Mesh(out.toFloatArray(), minX, minZ, maxX, maxZ, root.elevation(top) / 1000f + root.floor(top).wallHeight / 1000f, open, lights, ground, groundY, residentParts)
+            return Mesh(out.toFloatArray(), minX, minZ, maxX, maxZ, root.elevation(top) / 1000f + root.floor(top).wallHeight / 1000f, open, lights, ground, groundY, residentParts, residentRoute)
         }
     }
 }

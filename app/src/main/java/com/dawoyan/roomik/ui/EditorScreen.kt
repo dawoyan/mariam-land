@@ -424,6 +424,13 @@ fun EditorScreen(vm: AppViewModel) {
         else { tool = Tool.SELECT; selectOnly = category }
     } }
     LaunchedEffect(ed.tool, ed.category, ed.pointKind, ed.itemKind) { vm.saveEditorContext((if (ed.tool == Tool.SELECT) ed.category else ed.tool).name, ed.pointKind?.name, ed.itemKind) }
+    LaunchedEffect(vm.itemToPlace) {
+        vm.itemToPlace?.let { item ->
+            ed.category = Tool.INTERIOR; ed.tool = Tool.INTERIOR; ed.outdoor = false
+            ed.itemKind = item; ed.yardKind = null; ed.pointKind = null; ed.sel = null
+            vm.itemToPlace = null
+        }
+    }
     // a type chosen in the row while picking: from now on taps add that (the menu's own tool, as the row's chips expect)
     LaunchedEffect(ed.pointKind, ed.cableMode, ed.itemKind, ed.yardKind, ed.systemMode, ed.roadArea) {
         if (ed.tool != Tool.SELECT) return@LaunchedEffect
@@ -2631,6 +2638,7 @@ fun itemName(id: String): String {
     "bed" -> R.string.f_bed; "bed1" -> R.string.f_bed1; "sofa" -> R.string.f_sofa; "armchair" -> R.string.f_armchair
     "table" -> R.string.f_table; "chair" -> R.string.f_chair; "desk" -> R.string.f_desk; "wardrobe" -> R.string.f_wardrobe
     "tv" -> R.string.f_tv; "cabinet" -> R.string.f_cabinet; "fridge" -> R.string.f_fridge; "stove" -> R.string.f_stove
+    "vacuum" -> R.string.f_vacuum; "robot_vacuum" -> R.string.f_robot_vacuum
     "sink" -> R.string.f_sink; "washer" -> R.string.f_washer; "bath" -> R.string.f_bath; "stairs" -> R.string.f_stairs; "car" -> R.string.f_car; "fireplace" -> R.string.f_fireplace; "radiator" -> R.string.f_radiator
     "ac_out" -> R.string.f_ac_out; "ac_in" -> R.string.f_ac_in; "chimney" -> R.string.f_chimney; else -> R.string.f_toilet
     })

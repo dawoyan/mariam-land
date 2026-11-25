@@ -105,7 +105,7 @@ fun View3DScreen(vm: AppViewModel) {
     val context = LocalContext.current
     // What is shown: the whole house (null), or one floor on its own. Walking inside is on that floor, or on the one
     // being edited when the whole house is shown.
-    var shown by remember { mutableStateOf<Int?>(if (root.floors.isEmpty() && root.basements.isEmpty()) vm.floor else null) }
+    var shown by remember { mutableStateOf<Int?>(if (root.floors.isEmpty() && root.basements.isEmpty()) (if (vm.floor == com.dawoyan.roomik.core.SITE) root.groundFloor else vm.floor) else null) }
     val floorNo = (shown ?: vm.floor).let { if (it == com.dawoyan.roomik.core.SITE) root.groundFloor else it }
     val plan = root.floor(floorNo)
     // with a roof the house is first seen whole; low walls take the roof off to look in
@@ -165,8 +165,11 @@ fun View3DScreen(vm: AppViewModel) {
     if (photosOpen) SidePhotosDialog(root.id, onChanged = { photoTick++ }) { photosOpen = false }
     // layers turned on or off: the same view gets the new mesh, so the camera stays
     LaunchedEffect(renderer, ghost) { renderer.ghost = ghost; view.requestRender() }
+    var builtFor by remember(renderer) { mutableStateOf(hidden) }
     LaunchedEffect(renderer, hidden) {
+        if (hidden == builtFor) return@LaunchedEffect
         val m = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { meshFor(hidden) }
+        builtFor = hidden
         renderer.swap(m); view.requestRender()
     }
     LaunchedEffect(renderer, followResident) { renderer.followResident = followResident; if (followResident) renderer.startFollowing() }
@@ -361,7 +364,7 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
     @Volatile var weatherNight = false
     @Volatile var weatherCloudy = false
     @Volatile var followResident = true
-    private val residentRoute = ResidentNavigation.route(plan)
+    private val residentRoute = mesh.residentRoute
     private val animationStart = android.os.SystemClock.elapsedRealtime()
     private val span = max(mesh.maxX - mesh.minX, mesh.maxZ - mesh.minZ)
     @Volatile private var yaw = 25f

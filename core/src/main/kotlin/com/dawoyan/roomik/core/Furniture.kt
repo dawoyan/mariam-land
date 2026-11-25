@@ -36,6 +36,15 @@ object Furniture {
         }
         val base = Catalog.of(i.kind).color
         when (i.kind) {
+            "vacuum" -> {
+                b(0.0, w, 0.0, d, 0.0, 110.0, BLACK)
+                b(w * .25, w * .75, d * .35, d * .8, 110.0, h * .65, base)
+                b(w * .45, w * .55, d * .55, d * .7, h * .65, h, METAL)
+            }
+            "robot_vacuum" -> {
+                b(0.0, w, 0.0, d, 0.0, h * .8, BLACK)
+                b(w * .08, w * .92, d * .08, d * .92, h * .8, h, base)
+            }
             "bed", "bed1" -> {
                 b(0.0, w, 0.0, d - 60, 0.0, 300.0, WOOD)                       // frame
                 b(30.0, w - 30, 30.0, d - 80, 300.0, 480.0, WHITE)             // mattress

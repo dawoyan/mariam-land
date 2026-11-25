@@ -716,7 +716,6 @@ fun EditorScreen(vm: AppViewModel) {
                 }) + when {
                     ed.tool == Tool.ELECTRIC -> "\n" + stringResource(R.string.el_counts, plan.points.filter { it.kind == PointKind.SOCKET }.sumOf { it.count },
                         plan.points.count { it.kind == PointKind.SWITCH }, plan.points.count { it.kind == PointKind.LAMP })
-                    rooms.isNotEmpty() && (ed.tool in BUILD || ed.tool == Tool.SELECT) -> "\n" + stringResource(R.string.total_area, num(rooms.sumOf { it.area }, 1) + " " + stringResource(R.string.m2))
                     else -> ""
                 }
                 var help by remember { mutableStateOf(false) }
@@ -784,7 +783,6 @@ private fun PlanCanvas(vm: AppViewModel, ed: EditorState, plan: Plan, rooms: Lis
     val itemNames = Catalog.all.associate { it.id to itemName(it.id) }
     val tm = rememberTextMeasurer()
     val lang = language()
-    val m2 = stringResource(R.string.m2)
     val accent = MaterialTheme.colorScheme.primary
     val ruBoards = lang == "ru"
     val feedsText = stringResource(R.string.fed_by)
@@ -1943,11 +1941,10 @@ private fun PlanCanvas(vm: AppViewModel, ed: EditorState, plan: Plan, rooms: Lis
             val t = pl.name.ifBlank { pl.type?.label(lang) ?: placeWord }
             label(tm, t, Offset(o.x, o.y + r + 10.dp.toPx()), TextStyle(fontSize = 12.sp, color = Color(0xFF3B2A78), fontWeight = FontWeight.Medium), Color(0xCCF7F7F3))
         }
-        // Room names and clear floor areas.
+        // Room names only; measurements stay out of the 2D living view.
         for (r in rooms) {
             val title = r.info?.name?.takeIf { it.isNotEmpty() } ?: r.info?.type?.label(lang)
-            val text = (if (title != null) "$title\n" else "") + num(r.area) + " " + m2
-            label(tm, text, ed.toScreen(r.anchor), TextStyle(fontSize = 12.sp, color = Color(0xFF20242C), fontWeight = FontWeight.Medium, textAlign = TextAlign.Center), null)
+            if (title != null) label(tm, title, ed.toScreen(r.anchor), TextStyle(fontSize = 12.sp, color = Color(0xFF20242C), fontWeight = FontWeight.Medium, textAlign = TextAlign.Center), null)
         }
 
         // Warm floor: wavy lines over the room.
@@ -3463,11 +3460,6 @@ private fun SelectionPanel(vm: AppViewModel, ed: EditorState, plan: Plan, rooms:
                     Column(Modifier.weight(1f)) {
                         Text(room.info?.name?.takeIf { it.isNotEmpty() } ?: room.info?.type?.label(lang) ?: stringResource(R.string.room),
                             style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            stringResource(R.string.area) + " " + num(room.area) + " " + stringResource(R.string.m2) + " · " +
-                                stringResource(R.string.perimeter) + " " + num(room.perimeter) + " " + stringResource(R.string.m),
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                     IconButton(onClick = { vm.insideAt = room.anchor; vm.screen = Screen.VIEW3D }) { Icon(Icons.Default.ViewInAr, stringResource(R.string.view_inside)) }
                     IconButton(onClick = { editRoom = true }) { Icon(Icons.Default.Edit, stringResource(R.string.edit)) }

@@ -61,6 +61,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -103,6 +105,9 @@ import kotlin.math.sin
 fun View3DScreen(vm: AppViewModel) {
     val root = vm.root ?: return
     val context = LocalContext.current
+    val commandScope = rememberCoroutineScope()
+    var residentFeedback by remember { mutableStateOf("") }
+    var navigationJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     // What is shown: the whole house (null), or one floor on its own. Walking inside is on that floor, or on the one
     // being edited when the whole house is shown.
     var shown by remember { mutableStateOf<Int?>(if (root.floors.isEmpty() && root.basements.isEmpty()) (if (vm.floor == com.dawoyan.roomik.core.SITE) root.groundFloor else vm.floor) else null) }
@@ -159,6 +164,16 @@ fun View3DScreen(vm: AppViewModel) {
     // with a roof the house is first seen whole; low walls take the roof off to look in
 
     val view = remember(renderer) { PlanGlView(context, renderer) }
+    DisposableEffect(renderer) {
+        renderer.onActionComplete = { action ->
+            if (action == "vacuum") {
+                context.getSharedPreferences("mariam_companion", Context.MODE_PRIVATE).edit().putLong("cleaned", System.currentTimeMillis()).apply()
+                residentFeedback = "Я убрался. / Ես մաքրեցի տունը։"
+            } else if (action == "sleep") residentFeedback = "Я сплю. / Ես քնած եմ։"
+            else residentFeedback = "Я здесь. / Ես այստեղ եմ։"
+        }
+        onDispose { renderer.onActionComplete = null }
+    }
     // This GL view normally renders on demand. Request the intervening frames so a switch change visibly fades.
     LaunchedEffect(fadeToken) { if (fadeToken > 0) repeat(36) { withFrameNanos { }; view.requestRender() } }
     LaunchedEffect(view, photosReady) { view.requestRender() }
@@ -245,10 +260,32 @@ fun View3DScreen(vm: AppViewModel) {
                     if (!moved && !multi && lensDrag) {
                         // a tap on the lens does nothing more
                     } else if (!moved && !multi) {
-                        val hit = renderer.floorAt(down.position.x / size.width, down.position.y / size.height)
+                        val fx = down.position.x / size.width; val fy = down.position.y / size.height
+                        val hit = renderer.floorAt(fx, fy)
                         if (hit != null) {
-                            if (renderer.inside) renderer.walkTo(hit) else if (renderer.goInside(hit)) inside = true
-                            view.requestRender()
+                            val target = P(hit.x * 1000.0, hit.y * 1000.0)
+                            val item = plan.items.lastOrNull { item ->
+                                val atHeight = renderer.floorAt(fx, fy, (item.z + item.h * .5f) / 1000f)
+                                atHeight != null && Geo.inside(P(atHeight.x * 1000, atHeight.y * 1000), Interior.corners(item))
+                            } ?: plan.items.lastOrNull { Geo.inside(target, Interior.corners(it)) }
+                            val action = when (item?.kind) { "bed", "bed1" -> "sleep"; "vacuum", "robot_vacuum" -> "vacuum"; else -> "walk" }
+                            val destination = item?.let { P(it.x.toDouble(), it.y.toDouble()) } ?: target
+                            val start = renderer.residentPosition
+                            if (start == null) residentFeedback = "Не вижу жителя в этом этаже. / Այս հարկում բնակիչ չկա։"
+                            else {
+                              navigationJob?.cancel()
+                              navigationJob = commandScope.launch {
+                                residentFeedback = "Ищу путь… / Փնտրում եմ ճանապարհը…"
+                                val path = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { ResidentNavigation.route(plan, start, destination) }
+                                if (path.isEmpty()) {
+                                    residentFeedback = "Не могу туда пройти. Проверьте двери и мебель. / Չեմ կարող հասնել այնտեղ։"
+                                    com.dawoyan.roomik.Diagnostics.record(context, "command_failed action=$action reason=no_route")
+                                } else {
+                                    renderer.command(path, action, item?.let { P(it.x.toDouble(), it.y.toDouble()) })
+                                    residentFeedback = when (action) { "sleep" -> "Иду спать. / Գնում եմ քնելու։"; "vacuum" -> "Иду убираться. / Գնում եմ մաքրելու։"; else -> "Иду туда. / Գնում եմ այնտեղ։" }
+                                }
+                              }
+                            }
                         }
                     }
                 }
@@ -261,6 +298,9 @@ fun View3DScreen(vm: AppViewModel) {
                     val k = (lensR + 2.dp.toPx()) / 1.414f
                     drawLine(Color(0xFF2F7FD6), Offset(c.x + k, c.y + k), Offset(c.x + k + 28.dp.toPx(), c.y + k + 28.dp.toPx()), 7.dp.toPx(), cap = StrokeCap.Round)
                 }
+            }
+            if (residentFeedback.isNotBlank()) Surface(Modifier.align(Alignment.TopCenter).padding(8.dp), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface.copy(alpha = .94f)) {
+                Text(residentFeedback, modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
             }
             if (root.floors.isNotEmpty() || root.basements.isNotEmpty())
                 Row(Modifier.align(Alignment.TopStart).padding(8.dp).hScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -325,7 +365,7 @@ fun View3DScreen(vm: AppViewModel) {
                             }
                         }
                     }
-                    Text(stringResource(if (xray) R.string.hint_xray else if (inside) R.string.hint_inside else R.string.hint_3d), Modifier.fillMaxWidth(),
+                    Text(if (xray) stringResource(R.string.hint_xray) else "Нажмите на пол, кровать или пылесос, чтобы позвать жителя. / Հպեք հատակին կամ իրին։", Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
                 }
             }
@@ -360,6 +400,15 @@ private class Msaa : GLSurfaceView.EGLConfigChooser {
 
 /** Draws the plan mesh with an orbit camera: [yaw]/[pitch] in degrees around a target on the ground, [dist] metres away. */
 class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val base: Float = 0f, private val cutBase: Float = base) : GLSurfaceView.Renderer {
+    private data class ResidentCommand(val route: List<P>, val action: String, val objectAt: P?, val started: Long)
+    @Volatile private var residentCommand: ResidentCommand? = null
+    @Volatile var onActionComplete: ((String) -> Unit)? = null
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var notifiedCommand: ResidentCommand? = null
+    @Volatile var residentPosition: P? = mesh.residentRoute.firstOrNull(); private set
+    fun command(path: List<P>, action: String, objectAt: P?) {
+        residentCommand = ResidentCommand(path, action, objectAt, android.os.SystemClock.elapsedRealtime())
+    }
     @Volatile var weatherSnow = false
     @Volatile var weatherNight = false
     @Volatile var weatherCloudy = false
@@ -491,7 +540,7 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
     }
 
     /** The floor point under a screen point given as shares of the view's width and height, in metres; null above the horizon. */
-    fun floorAt(fx: Float, fy: Float): P? {
+    fun floorAt(fx: Float, fy: Float, height: Float = 0f): P? {
         val m = lastMvp ?: return null
         val inv = FloatArray(16)
         if (!Matrix.invertM(inv, 0, m, 0)) return null
@@ -503,7 +552,7 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
         val a = un(-1f); val b = un(1f)
         // the floor of the storey being looked at
         if (a[1] - b[1] <= 1e-6f) return null
-        val t = (a[1] - base) / (a[1] - b[1])
+        val t = (a[1] - (base + height)) / (a[1] - b[1])
         if (t < 0) return null
         return P((a[0] + (b[0] - a[0]) * t).toDouble(), (a[2] + (b[2] - a[2]) * t).toDouble())
     }
@@ -738,40 +787,50 @@ class PlanRenderer(private var mesh: Mesh, private val plan: Plan, private val b
         }
         val a = residentRoute.firstOrNull()
         if (a != null && mesh.residentParts.isNotEmpty()) {
-            val seconds = (android.os.SystemClock.elapsedRealtime() - animationStart) / 1000.0
-            val lengths = residentRoute.zipWithNext { u, v -> (v - u).len / 1000.0 }
+            val command = residentCommand
+            val seconds = (android.os.SystemClock.elapsedRealtime() - (command?.started ?: animationStart)) / 1000.0
+            val path = command?.route ?: residentRoute
+            val lengths = path.zipWithNext { u, v -> (v - u).len / 1000.0 }
             val distance = lengths.sum()
-            val duration = (distance / .35).coerceAtLeast(3.0)
+            val duration = (distance / if (command == null) .35 else 1.4).coerceAtLeast(.01)
             val period = 2 * duration + 8.0
-            val cycle = seconds % period
-            val moving = (cycle < duration || cycle >= duration + 4.0 && cycle < 2 * duration + 4.0) && distance > .1
-            val t = when {
+            val cycle = if (command == null) seconds % period else seconds
+            val moving = if (command != null) cycle < duration && distance > .05 else (cycle < duration || cycle >= duration + 4.0 && cycle < 2 * duration + 4.0) && distance > .1
+            val t = if (command != null) (cycle / duration).coerceIn(0.0, 1.0) else when {
                 cycle < duration -> cycle / duration
                 cycle < duration + 4.0 -> 1.0
                 cycle < 2 * duration + 4.0 -> 1.0 - (cycle - duration - 4.0) / duration
                 else -> 0.0
             }
             var remaining = distance * t
-            var current = a
+            var current = path.firstOrNull() ?: a
             for (i in lengths.indices) {
                 val length = lengths[i]
-                if (remaining <= length && length > 0) { current = residentRoute[i] + (residentRoute[i + 1] - residentRoute[i]) * (remaining / length); break }
-                remaining -= length; current = residentRoute[i + 1]
+                if (remaining <= length && length > 0) { current = path[i] + (path[i + 1] - path[i]) * (remaining / length); break }
+                remaining -= length; current = path[i + 1]
             }
+            val sleeping = command?.action == "sleep" && !moving
+            if (sleeping && command?.objectAt != null) current = command.objectAt
+            residentPosition = current
             val dx = ((current.x - a.x) / 1000).toFloat()
             val dz = ((current.y - a.y) / 1000).toFloat()
-            val walk = if (moving) sin(seconds * 4.0).toFloat() else 0f
+            val vacuuming = command?.action == "vacuum" && !moving && seconds < duration + 5.0
+            val walk = if (moving || vacuuming) sin(seconds * 4.0).toFloat() else 0f
             val bob = if (moving) kotlin.math.abs(walk) * .012f else (sin(seconds * 1.5) * .004).toFloat()
             mesh.residentParts.forEachIndexed { index, range ->
                 val swing = when (index) { 0, 4 -> walk * .09f; 1, 3 -> -walk * .09f; else -> 0f }
                 for (v in range) {
                     val k = v * Mesh.STRIDE
                     buffer.put(k, mesh.data[k] + dx)
-                    buffer.put(k + 1, mesh.data[k + 1] + if (index >= 2) bob else 0f)
-                    buffer.put(k + 2, mesh.data[k + 2] + dz + swing)
+                    buffer.put(k + 1, if (sleeping) base + .52f + (mesh.data[k + 2] - (a.y / 1000).toFloat()) * .35f else mesh.data[k + 1] + if (index >= 2) bob else 0f)
+                    buffer.put(k + 2, if (sleeping) (current.y / 1000).toFloat() + (mesh.data[k + 1] - base) * .8f - .65f else mesh.data[k + 2] + dz + swing)
                 }
             }
             if (followResident && !inside) follow(P(a.x + dx * 1000, a.y + dz * 1000))
+            if (command != null && !moving && (!vacuuming) && notifiedCommand !== command) {
+                notifiedCommand = command
+                mainHandler.post { if (residentCommand === command) onActionComplete?.invoke(command.action) }
+            }
         }
         val ghostOn = ghost && !inside
         val proj = FloatArray(16); val viewM = FloatArray(16); val mvp = FloatArray(16)

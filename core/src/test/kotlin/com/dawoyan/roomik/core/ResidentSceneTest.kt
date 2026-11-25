@@ -63,4 +63,25 @@ class ResidentSceneTest {
         assertTrue(!diagnosis.exteriorEntry)
         assertTrue(diagnosis.reason == "no_usable_door")
     }
+
+    @Test fun commandRoutesThroughDoorAndRejectsUnreachableRoom() {
+        var plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 4000, 4000)
+        plan = PlanOps.addRect(plan, 4000, 0, 8000, 4000)
+        val from = P(1000.0, 2000.0); val target = P(7000.0, 2000.0)
+        assertTrue(ResidentNavigation.route(plan, from, target).isEmpty())
+        plan = assertNotNull(PlanOps.addOpening(plan, OpeningKind.DOOR, P(4000.0, 2000.0), 500.0))
+        val route = ResidentNavigation.route(plan, from, target)
+        assertTrue(route.size > 1)
+        assertTrue((route.last() - target).len < 500.0)
+        assertTrue(route.zipWithNext().all { (a, b) -> Interior.canWalk(plan, a, b) })
+    }
+
+    @Test fun residentCanLeaveBedAfterSleeping() {
+        var plan = PlanOps.addRect(Plan("test", "Home"), 0, 0, 5000, 4000)
+        plan = PlanOps.addItem(plan, "bed", 1500, 2000)
+        val bed = plan.items.single()
+        val route = ResidentNavigation.route(plan, P(bed.x.toDouble(), bed.y.toDouble()), P(4000.0, 2000.0))
+        assertTrue(route.size > 1)
+        assertTrue((route.last() - P(4000.0, 2000.0)).len < 500)
+    }
 }

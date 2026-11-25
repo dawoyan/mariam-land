@@ -255,17 +255,34 @@ class Mesh(
                     box(rect(p + P(dx, dy), P(1.0, 0.0), w / 2, d / 2), y0, y1, color)
                     residentParts += start until (out.size / STRIDE)
                 }
+                fun head() {
+                    val start = out.size / STRIDE
+                    val rings = 10; val segments = 16
+                    fun vertex(i: Int, j: Int) {
+                        val lat = Math.PI * i / rings; val lon = 2.0 * Math.PI * j / segments
+                        val nx = kotlin.math.sin(lat) * kotlin.math.cos(lon); val nz = kotlin.math.sin(lat) * kotlin.math.sin(lon); val ny = kotlin.math.cos(lat)
+                        v(p + P(nx * 118, nz * 103), 1.505f + bob + (ny * .155).toFloat(), nx.toFloat(), ny.toFloat(), nz.toFloat(), 0xE6B392)
+                    }
+                    for (i in 0 until rings) for (j in 0 until segments) {
+                        vertex(i, j); vertex(i + 1, j); vertex(i + 1, j + 1)
+                        vertex(i, j); vertex(i + 1, j + 1); vertex(i, j + 1)
+                    }
+                    residentParts += start until (out.size / STRIDE)
+                }
                 part(-90.0, stride, 130.0, 180.0, 0f, .75f, 0x344866)
                 part(90.0, -stride, 130.0, 180.0, 0f, .75f, 0x344866)
                 part(0.0, 0.0, 340.0, 200.0, .75f, 1.35f + bob, 0xD96375)
                 part(-230.0, -stride * .6, 100.0, 130.0, .85f, 1.3f + bob, 0xE6B392)
                 part(230.0, stride * .6, 100.0, 130.0, .85f, 1.3f + bob, 0xE6B392)
-                part(0.0, 0.0, 235.0, 200.0, 1.36f + bob, 1.65f + bob, 0xE6B392)
+                head()
                 part(0.0, -35.0, 255.0, 180.0, 1.64f + bob, 1.73f + bob, 0x44352E)
                 part(0.0, -95.0, 255.0, 70.0, 1.39f + bob, 1.68f + bob, 0x44352E)
                 part(-48.0, 104.0, 28.0, 10.0, 1.53f + bob, 1.56f + bob, 0x322927)
                 part(48.0, 104.0, 28.0, 10.0, 1.53f + bob, 1.56f + bob, 0x322927)
-                part(0.0, 105.0, 65.0, 10.0, 1.445f + bob, 1.46f + bob, 0xAD555A)
+                part(-2.0, 107.0, 14.0, 12.0, 1.49f + bob, 1.51f + bob, 0xCF9478)
+                part(0.0, 105.0, 46.0, 10.0, 1.445f + bob, 1.453f + bob, 0xAD555A)
+                part(-28.0, 102.0, 12.0, 8.0, 1.452f + bob, 1.46f + bob, 0xAD555A)
+                part(28.0, 102.0, 12.0, 8.0, 1.452f + bob, 1.46f + bob, 0xAD555A)
             }
 
             // A plinth under the ground floor's walls, down to the ground when the house stands above it.

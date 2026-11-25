@@ -22,7 +22,7 @@ object ResidentNavigation {
         return Diagnosis(rooms.size, doors, outside, path.size, length, reason)
     }
 
-    fun route(plan: Plan): List<P> {
+    fun route(plan: Plan, from: P? = null, destination: P? = null): List<P> {
         val rooms = Rooms.detect(plan).filter { it.info?.type?.name !in setOf("YARD", "BALCONY", "GARAGE") }
         if (rooms.isEmpty()) return emptyList()
         val all = rooms.flatMap { it.polygon }
@@ -44,6 +44,8 @@ object ResidentNavigation {
         }
         fun valid(p: P): Boolean = rooms.any { Geo.inside(p, it.polygon) } && furniture.none { Geo.inside(p, it) } &&
             walls.all { (wall, a, b) -> Geo.distToSegment(p, a, b) >= wall.thickness / 2.0 + 25 }
+        if (from != null && destination != null && rooms.none { Geo.inside(destination, it.polygon) } &&
+            canWalk(from, destination) && furniture.none { f -> (1..20).any { k -> Geo.inside(from + (destination - from) * (k / 20.0), f) } }) return listOf(from, destination)
         val valid = BooleanArray(nx * ny) { valid(at(it)) }
         val startRoom = rooms.maxByOrNull { room -> plan.items.count { Geo.inside(P(it.x.toDouble(), it.y.toDouble()), room.polygon) } * 10000.0 + room.area }!!
         val entry = doors.values.flatten().asSequence().filter { it.opening.kind != OpeningKind.WINDOW }.mapNotNull { opening ->
@@ -59,7 +61,9 @@ object ResidentNavigation {
                 .minByOrNull { (at(it) - outside).len }
             inside?.let { outside to it }
         }.firstOrNull()
-        val start = entry?.second ?: valid.indices.filter { valid[it] && Geo.inside(at(it), startRoom.polygon) }.minByOrNull { (at(it) - startRoom.anchor).len } ?: return listOf(startRoom.anchor)
+        val requestedStart = from?.let { pos -> valid.indices.asSequence().filter { valid[it] && (at(it) - pos).len < 2000 && canWalk(pos, at(it)) && furniture.none { f -> !Geo.inside(pos, f) && (1..4).any { k -> Geo.inside(pos + (at(it) - pos) * (k / 5.0), f) } } }.minByOrNull { (at(it) - pos).len } }
+        if (from != null && requestedStart == null) return emptyList()
+        val start = requestedStart ?: entry?.second ?: valid.indices.filter { valid[it] && Geo.inside(at(it), startRoom.polygon) }.minByOrNull { (at(it) - startRoom.anchor).len } ?: return listOf(startRoom.anchor)
         val parents = IntArray(valid.size) { -1 }; val queue = ArrayDeque<Int>(); queue.add(start); parents[start] = start
         while (queue.isNotEmpty()) {
             val i = queue.removeFirst(); val x = i % nx; val y = i / nx
@@ -75,7 +79,9 @@ object ResidentNavigation {
         }
         val reachable = valid.indices.filter { parents[it] >= 0 }
         val targets = plan.items.filter { it.kind in setOf("fridge", "toilet", "bed", "bed1", "sofa", "chair") }
-        val end = targets.mapNotNull { item ->
+        val requestedEnd = destination?.let { target -> reachable.minByOrNull { (at(it) - target).len }?.takeIf { (at(it) - target).len < 1600.0 } }
+        if (destination != null && requestedEnd == null) return emptyList()
+        val end = requestedEnd ?: targets.mapNotNull { item ->
             val p = P(item.x.toDouble(), item.y.toDouble())
             reachable.minByOrNull { (at(it) - p).len }?.let { it to (at(it) - p).len }
         }.filter { it.second < 1600 }.maxByOrNull { (at(it.first) - at(start)).len }?.first
@@ -83,6 +89,6 @@ object ResidentNavigation {
         val result = mutableListOf<Int>(); var i = end
         while (i != start) { result.add(i); i = parents[i] }
         result.add(start); result.reverse()
-        return listOfNotNull(entry?.first) + result.map(::at)
+        return listOfNotNull(if (from != null) from else entry?.first) + result.map(::at)
     }
 }

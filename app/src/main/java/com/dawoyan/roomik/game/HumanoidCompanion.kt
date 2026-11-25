@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,6 +43,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -52,14 +56,16 @@ import com.dawoyan.roomik.core.allFloors
 import com.dawoyan.roomik.core.YardKind
 import java.util.Locale
 
-private data class HomeProgress(val bedrooms: Int, val toilet: Boolean, val kitchen: Boolean, val lights: Int, val yard: Boolean) {
-    val score: Int get() = (bedrooms.coerceAtMost(3) * 18) + (if (toilet) 18 else 0) + (if (kitchen) 22 else 0) + (lights.coerceAtMost(3) * 2) + (if (yard) 6 else 0)
-    val complete: Boolean get() = bedrooms >= 3 && toilet && kitchen && lights >= 3 && yard
+private data class HomeProgress(val bedrooms: Int, val bed: Boolean, val toilet: Boolean, val kitchen: Boolean, val lights: Int, val yard: Boolean) {
+    val checks get() = listOf("Спальня" to (bedrooms > 0), "Кровать" to bed, "Туалет" to toilet, "Еда: холодильник и плита" to kitchen, "Свет" to (lights > 0), "Двор" to yard)
+    val score: Int get() = checks.count { it.second } * 100 / checks.size
+    val complete: Boolean get() = checks.all { it.second }
     fun next(): String = when {
-        bedrooms < 3 -> "Нужны спальни: $bedrooms из 3. Добавьте комнату и выберите тип «Спальня»."
+        bedrooms < 1 -> "Мне нужна спальня. Добавьте комнату и выберите тип «Спальня». / Ինձ ննջասենյակ է պետք։"
+        !bed -> "Мне нужна кровать, чтобы спать. / Ինձ մահճակալ է պետք։"
         !toilet -> "Я не вижу туалет. Добавьте его в разделе «Интерьер → Ванная»."
         !kitchen -> "Нужна кухня: поставьте холодильник и плиту."
-        lights < 3 -> "Дома темно. Добавьте ещё светильники: $lights из 3."
+        lights < 1 -> "Дома темно. Добавьте светильник. / Տանը մութ է։"
         !yard -> "Хочу двор! Добавьте участок / двор в инструментах участка."
         else -> "Дом готов — он удобный, светлый и мне очень нравится!"
     }
@@ -90,20 +96,14 @@ fun HumanoidCompanion(vm: AppViewModel) {
         prefs.edit().putString("place", place).putInt("happiness", happiness).apply()
     }
 
-    Box(Modifier.fillMaxSize().padding(end = 12.dp, bottom = 18.dp), contentAlignment = Alignment.BottomEnd) {
-        Card(modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
-                Image(painterResource(portrait), null, Modifier.height(58.dp).graphicsLayer { translationX = pulse })
-                Column(Modifier.padding(start = 5.dp)) {
-                    Text("$face $name · $happiness%")
-                    Text("📍 $place", style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
-                    LinearProgressIndicator(progress = { progress.score / 100f }, modifier = Modifier.size(width = 74.dp, height = 5.dp))
-                    TextButton(onClick = { careOpen = true }) { Text("🌱 🐕 Уход") }
-                }
+    Surface(color = Color.Transparent, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$face $name · $happiness%", modifier = Modifier.weight(1f).clickable { dialog = true }, style = MaterialTheme.typography.labelLarge)
+                TextButton(onClick = { careOpen = true }) { Text("🌱 🐕") }
+                TextButton(onClick = { dialog = true }) { Text("💬") }
             }
-        }
-        FloatingActionButton(onClick = { dialog = true }, containerColor = Color(0xFFFFC857)) {
-            Icon(Icons.Filled.Chat, "Поговорить с жителем")
+            Text(progress.checks.joinToString("  ") { (label, done) -> "${if (done) "✓" else "○"} $label" }, style = MaterialTheme.typography.labelSmall, maxLines = 2)
         }
     }
     if (dialog && selected.isEmpty()) CharacterChoice(
@@ -112,13 +112,13 @@ fun HumanoidCompanion(vm: AppViewModel) {
             residentName = chosenName
             residentAge = age
             prefs.edit().putString("character", choice).putString("name", chosenName).putInt("age", age).apply()
-            speak("Привет! Я $chosenName, мне $age. Я хочу дом с тремя спальнями, кухней, туалетом, светом и двором.")
+            speak("Привет! Я $chosenName, мне $age. Я хочу уютный дом.")
         }
     )
     if (dialog && selected.isNotEmpty()) ResidentDialog(name, residentAge, portrait, face, progress, pulse, place, speak, ::go) { dialog = false }
     if (careOpen) {
         val root = vm.root
-        val trees = root?.let { it.allFloors.flatMap { floor -> floor.models } + it.site?.models.orEmpty() }.orEmpty()
+        val trees = root?.allFloors.orEmpty().flatMap { it.models }
             .filter { it.yard?.kind in setOf(YardKind.TREE, YardKind.POPLAR, YardKind.CYPRESS) }
         var tick by remember { mutableStateOf(System.currentTimeMillis()) }
         var dog by remember { mutableStateOf(prefs.getBoolean("dog", false)) }
@@ -149,6 +149,7 @@ private fun homeProgress(vm: AppViewModel): HomeProgress {
     val items = floors.flatMap { it.items }
     return HomeProgress(
         bedrooms = floors.sumOf { floor -> floor.rooms.count { it.type?.name == "BEDROOM" } },
+        bed = items.any { it.kind == "bed" || it.kind == "bed1" },
         toilet = items.any { it.kind == "toilet" },
         kitchen = items.any { it.kind == "fridge" } && items.any { it.kind == "stove" },
         lights = floors.sumOf { floor -> floor.points.count { it.kind == PointKind.LAMP } },
@@ -192,7 +193,8 @@ private fun ResidentDialog(name: String, age: Int, portrait: Int, face: String, 
             var reply by remember(progress, place) { mutableStateOf(message) }
             Image(painterResource(portrait), null, Modifier.height(150.dp).graphicsLayer { translationY = bob })
             Text("Вы: Какой дом ты хочешь?")
-            Text("$name${if (age > 0) ", $age" else ""}: Я хочу дом с тремя спальнями, двором, кухней, туалетом и светом.")
+            Text("$name${if (age > 0) ", $age" else ""}: Я хочу уютный дом.")
+            progress.checks.forEach { (label, done) -> Text("${if (done) "✓" else "○"} $label") }
             Text("$name: $reply")
             Text("Настроение зависит от поездок: работа снижает его, магазин и спортзал повышают.")
             OutlinedTextField(question, { question = it }, label = { Text("Спросите жителя") }, singleLine = true)

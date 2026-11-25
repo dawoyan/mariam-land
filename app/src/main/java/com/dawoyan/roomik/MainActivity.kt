@@ -10,6 +10,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -56,14 +59,16 @@ class MainActivity : ComponentActivity() {
             else lightColorScheme(primary = Color(0xFF2F6B8A), secondary = Color(0xFFFFC857))
             MaterialTheme(colorScheme = scheme) {
                 BackHandler(vm.screen != Screen.PROJECTS) { vm.back() }
-                Box {
-                    when (vm.screen) {
-                        Screen.PROJECTS -> ProjectsScreen(vm)
-                        Screen.EDITOR -> EditorScreen(vm)
-                        Screen.VIEW3D -> View3DScreen(vm)
-                        Screen.MATERIALS -> MaterialsScreen(vm)
+                Column(Modifier.fillMaxSize()) {
+                    if (vm.screen == Screen.EDITOR || vm.screen == Screen.VIEW3D) HumanoidCompanion(vm)
+                    Box(Modifier.weight(1f)) {
+                        when (vm.screen) {
+                            Screen.PROJECTS -> ProjectsScreen(vm)
+                            Screen.EDITOR -> EditorScreen(vm)
+                            Screen.VIEW3D -> View3DScreen(vm)
+                            Screen.MATERIALS -> MaterialsScreen(vm)
+                        }
                     }
-                    HumanoidCompanion(vm)
                 }
             }
         }
